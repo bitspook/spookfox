@@ -1,0 +1,7 @@
+{
+  "name": "spookfox",
+  "description": "Communicate with Firefox from spookmax",
+  "path": "/home/channi/Documents/work/spookfox/target/debug/spookfox-native",
+  "type": "stdio",
+  "allowed_extensions": [ "spookfox@bitspook.in" ]
+}
