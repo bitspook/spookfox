@@ -15,7 +15,7 @@ Communicate between Firefox and Emacs. Because [[https://nyxt.atlas.engineer/][N
    now in an org file. Configure the [[https://orgmode.org/manual/Template-elements.html][target]]:
 
    #+begin_src elisp
-     (setq spookfox-saved-tabs-target '(file+olp "~/org/browser.org" "Open Tabs"))
+     (setq spookfox-saved-tabs-target '(file+headline "~/org/browser.org" "Open Tabs"))
    #+end_src
 
    Now you can save all your currently open browser tabs in the configured target.
