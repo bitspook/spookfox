@@ -1,2 +1,4 @@
 /target/
 /.log/
+node_modules
+.parcel-cache

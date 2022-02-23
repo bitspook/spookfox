@@ -13,12 +13,16 @@
 ;;; Code:
 (require 'cl-lib)
 (require 'json)
+(require 'org-capture)
 
 (defvar sf--connection nil
   "Connection to spookfox socket.")
 
 (defvar sf--last-action-output nil
   "Output produced by last spookfox action.")
+
+(defvar spookfox-archived-tabs-target nil
+  "Target parse-able by org-capture-template where archived tabs will be saved.")
 
 (defun sf--process-output-filter (process output)
   "Save OUTPUT of last action sent to spookfox PROCESS.
@@ -84,6 +88,28 @@ exit condition in recursive re-checks."
   "Get details of active tab in browser."
   (sf--send-action "GET_ACTIVE_TAB")
   (sf--get-last-message))
+
+(defun sf--get-all-tabs ()
+  "Get all tabs currently present in browser."
+  (sf--send-action "GET_ALL_TABS")
+  (sf--get-last-message))
+
+(defun sf--tabs-to-org-nodes (tabs)
+  "Convert spookfox browser TABS to level 1 org-subtrees."
+  (mapconcat
+   (lambda (tab)
+     (concat "* " (plist-get tab :title) "\n:PROPERTIES:\n:URL:\t" (plist-get tab :url) "\n:END:\n"))
+   tabs))
+
+(defun sf--save-tabs ()
+  "Save spookfox tabs as an `org-mode` subtree.
+
+Tabs subtree is saved in `spokfox-archived-tabs-target`"
+  (let* ((tabs (sf--get-all-tabs))
+         (tabs-subtree (sf--tabs-to-org-nodes tabs)))
+    (org-capture-set-target-location spookfox-archived-tabs-target)
+    (org-capture-put :template tabs-subtree)
+    (org-capture-place-template)))
 
 (provide 'spookfox)
 ;;; spookfox.el ends here

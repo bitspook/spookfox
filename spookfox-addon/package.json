@@ -1,0 +1,22 @@
+{
+  "name": "spookfox",
+  "version": "0.1.0",
+  "license": "GPLv3",
+  "scripts": {
+    "start": "parcel serve src/manifest.json",
+    "build": "parcel build src/manifest.json",
+    "lint": "eslint src/ && tsc"
+  },
+  "devDependencies": {
+    "@parcel/config-webextension": "^2.3.2",
+    "@typescript-eslint/eslint-plugin": "^5.12.1",
+    "@typescript-eslint/parser": "^5.12.1",
+    "eslint": "^8.9.0",
+    "eslint-config-prettier": "^8.4.0",
+    "eslint-plugin-prettier": "^4.0.0",
+    "parcel": "^2.3.2",
+    "prettier": "^2.5.1",
+    "typescript": "^4.5.5",
+    "web-ext-types": "^3.2.1"
+  }
+}

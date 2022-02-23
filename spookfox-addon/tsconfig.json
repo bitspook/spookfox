@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact/compat",
+    "target": "ES2020",
+    "moduleResolution": "node",
+    "experimentalDecorators": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "baseUrl": ".",
+    "typeRoots": ["node_modules/@types", "node_modules/web-ext-types"],
+    "paths": {
+      "~*": ["./*"]
+    }
+  }
+}

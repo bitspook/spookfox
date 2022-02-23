@@ -7,6 +7,8 @@ mkShell {
   buildInputs = [
     cargo-edit
     rust-analyzer
+    nodejs
+    yarn
     (rust-bin.stable.latest.default.override {
       extensions = [
         "rust-src"

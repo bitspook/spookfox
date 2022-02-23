@@ -2,7 +2,20 @@
 
 Communicate between Firefox and Emacs. Because [[https://nyxt.atlas.engineer/][Nyxt]] is just not there yet.
 
-Spookfox has 3 primary components:
+** Features
+
+1. *Get active tab*
+
+   #+begin_src elisp
+     (sf--get-active-tab)
+   #+end_src
+
+   #+RESULTS:
+   | :title | Toolbox - Extension / Spookfox | :url | about:devtools-toolbox?id=spookfox%40bitspook.in&type=extension |
+
+   I use this to quickly capture notes for what I am reading in Firefox.
+
+** Architecture
 1. *spookfox.el*: Emacs package written in Emacs Lisp
 2. *spookfox-addon*: Firefox extension written in Javascript
 3. *spookfox-native*: Glue code written in Rust
@@ -12,25 +25,16 @@ accepts input from stdin, and provides its output at stdout. Emacs itself proved
 unusable for that purpose. So I've written some glue code which communicates
 with the Browser.
 
-** Features
-
-1. *Get active tab*
-
-   #+begin_src elisp
-     (sf--get-active-tab)
-     ;; (:title "gnu.org/software/emacs/manual/html_node/elisp/Filter-Functions.html"
-     ;;  :url "https://www.gnu.org/software/emacs/manual/html_node/elisp/Filter-Functions.html")
-   #+end_src
-
-   I use this to quickly capture notes for what I am reading in Firefox.
-
-** Architecture
-
 *** Components
-1. <<sn>> : spookfox-native : Rust side
-2. <<sa>> : spookfox-addon : Firefox side
-3. <<se>> : spookfox-el : Emacs side
+
+Spookfox has 3 primary components:
+
+1. <<sn>> : spookfox-native : Glue code written in Rust
+2. <<sa>> : spookfox-addon : Firefox addon written in Javascript
+3. <<se>> : spookfox-el : Emacs package written in Emacs Lisp
 4. <<ss>> : spookfox-socket : A UNIX socket used for IPC b/w [[se]] and [[sn]]
+
+4th is just a file (well socket, but you know what I mean).
 
 *** Flow
 
