@@ -23,5 +23,6 @@
   "permissions": [
     "nativeMessaging",
     "tabs"
-  ]
+  ],
+  "content_security_policy": "script-src 'self' 'unsafe-eval' blob: filesystem:;object-src 'self' blob: filesystem:;"
 }

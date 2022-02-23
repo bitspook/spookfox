@@ -16,7 +16,7 @@
   },
 
   "background": {
-    "scripts": ["background.js"]
+    "scripts": ["./background.ts"]
   },
 
   "browser_action": {

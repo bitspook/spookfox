@@ -1,3 +1,36 @@
+interface SFMessage {
+  type: 'Success' | 'Error';
+  payload: string;
+  sender: string;
+}
+
+interface SFAction {
+  type: string;
+}
+
+interface Tab {
+  id: number;
+  title: string;
+  url: string;
+  isPinned: boolean;
+}
+
+interface SFErrorMessage {
+  type: 'Error';
+  message: string;
+}
+
+type Result<R> = SFErrorMessage | R;
+
+const fromBrowserTab = (tab: browser.tabs.Tab): Tab => {
+  return {
+    id: tab.id,
+    title: tab.title,
+    url: tab.url,
+    isPinned: tab.pinned,
+  };
+};
+
 const port = browser.runtime.connectNative('spookfox');
 
 port.onDisconnect.addListener((p) => {
@@ -7,23 +40,23 @@ port.onDisconnect.addListener((p) => {
   }
 });
 
-port.onMessage.addListener(async (msg) => {
+port.onMessage.addListener(async (msg: SFMessage) => {
   if (!msg.payload) {
     console.warn('Unknown message:', msg);
     return;
   }
 
   try {
-    const action = JSON.parse(msg.payload);
+    const action: SFAction = JSON.parse(msg.payload);
 
     switch (action.type) {
       case 'GET_ACTIVE_TAB': {
-        const msg_1 = await getActiveTab();
-        return port.postMessage(msg_1);
+        const msg = await getActiveTab();
+        return port.postMessage(msg);
       }
       case 'GET_ALL_TABS': {
-        const msg_2 = await getAllTabs();
-        return port.postMessage(msg_2);
+        const msg = await getAllTabs();
+        return port.postMessage(msg);
       }
       default:
         console.warn(`Unknown action [action=${JSON.stringify(action)}]`);
@@ -33,29 +66,21 @@ port.onMessage.addListener(async (msg) => {
   }
 });
 
-const getActiveTab = async () => {
+const getActiveTab = async (): Promise<Result<Tab>> => {
   const tabs = await browser.tabs.query({ currentWindow: true, active: true });
   if (!tabs.length) {
     return { type: 'Error', message: 'No active tabs found' };
   }
 
-  const activeTab = tabs[0];
-
-  return {
-    url: activeTab.url,
-    title: activeTab.title,
-  };
+  return fromBrowserTab(tabs[0]);
 };
 
 const getAllTabs = async () => {
   const tabs = await browser.tabs.query({ currentWindow: true });
 
-  return tabs.map((tab) => ({
-    url: tab.url,
-    title: tab.title,
-  }));
+  return tabs.map(fromBrowserTab);
 };
 
 browser.browserAction.onClicked.addListener(async () => {
-  console.warn('TABS', await getActiveTab());
+  console.warn('TABS', await getAllTabs());
 });
