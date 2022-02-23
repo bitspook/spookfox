@@ -4,16 +4,44 @@ Communicate between Firefox and Emacs. Because [[https://nyxt.atlas.engineer/][N
 
 ** Features
 
-1. *Get active tab*
+1. Save all open tabs as org-mode subtrees.
+
+   I have a habit of opening too many browser tabs open, many of which I don't
+   even visit as often. Although the browser would discard the tab to save
+   resources, it is still clutter. And too easy to accidentally click on it and
+   waste precious CPU/RAM.
+
+   To remedy that, we can save all the browser tabs open in the browser right
+   now in an org file. Configure the [[https://orgmode.org/manual/Template-elements.html][target]]:
 
    #+begin_src elisp
-     (sf--get-active-tab)
+     (setq spookfox-saved-tabs-target '(file+olp "~/org/browser.org" "Open Tabs"))
    #+end_src
 
-   #+RESULTS:
-   | :title | Toolbox - Extension / Spookfox | :url | about:devtools-toolbox?id=spookfox%40bitspook.in&type=extension |
+   Now you can save all your currently open browser tabs in the configured target.
 
-   I use this to quickly capture notes for what I am reading in Firefox.
+   #+begin_src elisp
+     (spookfox-save-all-tabs)
+   #+end_src
+
+   This will open an org capture buffer where you can preview and change the
+   tabs as org nodes before saving.
+
+   Note: This will not close open tabs in browser. You can have that pleasure
+   yourself.
+
+2. *Get active tab*
+
+#+begin_src elisp
+  (sf--get-active-tab)
+#+end_src
+
+#+RESULTS:
+| :title | Toolbox - Extension / Spookfox | :url | about:devtools-toolbox?id=spookfox%40bitspook.in&type=extension |
+
+I use this to quickly capture notes for what I am reading in Firefox. This is
+not an interactive command (i.e you can't call it with =M-x=), because what
+would you want to do that for?
 
 ** Architecture
 1. *spookfox.el*: Emacs package written in Emacs Lisp
@@ -36,7 +64,7 @@ Spookfox has 3 primary components:
 
 4th is just a file (well socket, but you know what I mean).
 
-*** Flow
+*** Control Flows
 
 - [[sa]] starts [[sn]] on browser startup.
 

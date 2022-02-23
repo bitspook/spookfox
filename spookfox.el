@@ -22,7 +22,7 @@
   "Output produced by last spookfox action.")
 
 (defvar spookfox-saved-tabs-target nil
-  "Target parse-able by org-capture-template where archived tabs will be saved.")
+  "Target parse-able by org-capture-template where browser tabs will be saved.")
 
 (defun sf--process-output-filter (process output)
   "Save OUTPUT of last action sent to spookfox PROCESS.
@@ -110,7 +110,7 @@ This function is useful for `org-map-entries`."
 
 (defun sf--save-tabs ()
   "Save spookfox tabs as an `org-mode` subtree.
-Tabs subtree is saved in `spokfox-archived-tabs-target`"
+Tabs subtree is saved in `spokfox-saved-tabs-target`"
   (let* ((tabs (sf--get-all-tabs))
          (tabs-subtree (seq-mapcat #'sf--serialize-tab tabs 'string)))
     (org-capture-set-target-location spookfox-saved-tabs-target)
