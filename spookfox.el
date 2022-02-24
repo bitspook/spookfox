@@ -1,4 +1,4 @@
-;;; package --- Summary
+;;; package --- Summary -*- lexical-binding: t -*-
 ;;;
 ;;; Communicate with a browser which have spookfox browser addon installed.
 ;;
@@ -24,7 +24,7 @@
 (defvar spookfox-saved-tabs-target nil
   "Target parse-able by org-capture-template where browser tabs will be saved.")
 
-(defun sf--process-output-filter (process output)
+(defun sf--process-output-filter (_process output)
   "Save OUTPUT of last action sent to spookfox PROCESS.
 For now let's only keep track of the last message. If it the
 communication b/w browser and Emacs gets noisier, we'll introduce
@@ -139,6 +139,8 @@ make changes."
   (interactive)
   (sf--save-tabs))
 
+(defun spookfox-open-saved-tab ()
+  "Select and open a browser tab from saved tabs.")
 
 (provide 'spookfox)
 ;;; spookfox.el ends here
