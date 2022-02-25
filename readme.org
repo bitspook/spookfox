@@ -30,18 +30,43 @@ Communicate between Firefox and Emacs. Because [[https://nyxt.atlas.engineer/][N
    Note: This will not close open tabs in browser. You can have that pleasure
    yourself.
 
-2. *Get active tab*
+2. Open a saved tab
 
-#+begin_src elisp
+   Once you have saved the gazillion tabs you had open in your browser, you can
+   structure them in the =spookfox-saved-tabs-target= any way you desire, as
+   long as the you maintain the integrity of properties spookfox added to
+   =:PROPERTIES:= drawer.
+
+   You can use =spookfox-open-tab= to select one of the saved tabs and open it
+   in the browser connected via spookfox. It uses Emacs' built-in completion, so
+   if you are using something like ivy or helm you might see a completion UI.
+
+   #+begin_src elisp
+     (spookfox-open-tab)
+   #+end_src
+
+   *Behavior*:
+
+   - If an existing tab is selected
+     - If it is already present in browser, it is focused. Else a new tab is
+       opened
+   - If you enter a string which don't match any existing saved tabs
+     - If entered string is a valid http(s) URL, a new tab with this URL is
+       opened. Else a search with your configured search engine is performed in
+       the new tab.
+
+3. Get active tab
+
+  #+begin_src elisp
   (sf--get-active-tab)
-#+end_src
+  #+end_src
 
-#+RESULTS:
-| :title | Toolbox - Extension / Spookfox | :url | about:devtools-toolbox?id=spookfox%40bitspook.in&type=extension |
+  #+RESULTS:
+  | :id | 97 | :isPinned | :false | :title | permissions - Mozilla | MDN | :url | https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/manifest.json/permissions |
 
-I use this to quickly capture notes for what I am reading in Firefox. This is
-not an interactive command (i.e you can't call it with =M-x=), because what
-would you want to do that for?
+  I use this to quickly capture notes for what I am reading in Firefox. This is
+  not an interactive command (i.e you can't call it with =M-x=), because what
+  would you want to do that for?
 
 ** Architecture
 1. *spookfox.el*: Emacs package written in Emacs Lisp
