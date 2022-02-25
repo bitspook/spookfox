@@ -23,5 +23,5 @@
     "default_icon": "icons/message.svg"
   },
 
-  "permissions": ["nativeMessaging", "tabs"]
+  "permissions": ["nativeMessaging", "tabs", "search"]
 }

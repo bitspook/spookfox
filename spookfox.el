@@ -165,8 +165,13 @@ TAB_ID is discarded."
                        (annotation-function . ,annotation-function)
                        (category . spookfox-tab))
                    (complete-with-action action tabs string pred)))
-               nil t nil 'sf--tab-history)))
-    (cdr (assoc tab tabs))))
+               nil nil nil 'sf--tab-history)))
+    (or (cdr (assoc tab tabs))
+        tab)))
+
+(defun sf--tab-p (tab)
+  "Returns `t' if TAB is a spookfox tab, `nil' otherwise."
+  (when (plist-get tab :tabId) t))
 
 ;; Public interface
 (defun spookfox-save-all-tabs ()
@@ -180,7 +185,9 @@ make changes."
   "Prompt user to select a tab and open it in spookfox browser."
   (interactive)
   (let ((tab (sf--tab-read)))
-    (sf--send-action "OPEN_TAB" tab)))
+    (if (sf--tab-p tab)
+        (sf--send-action "OPEN_TAB" tab)
+      (sf--send-action "SEARCH_FOR" tab))))
 
 (provide 'spookfox)
 ;;; spookfox.el ends here

@@ -527,36 +527,6 @@ const fromBrowserTab = (tab)=>{
         isPinned: tab.pinned
     };
 };
-const port = browser.runtime.connectNative('spookfox');
-port.onDisconnect.addListener((p)=>{
-    console.log('Disconnected from Native APP');
-    if (p.error) console.error('Disconnected due to error', p.error);
-});
-port.onMessage.addListener(async (msg)=>{
-    if (!msg.payload) {
-        console.warn('Unknown message:', msg);
-        return;
-    }
-    try {
-        const action = JSON.parse(msg.payload);
-        switch(action.type){
-            case 'GET_ACTIVE_TAB':
-                {
-                    const msg = await getActiveTab();
-                    return port.postMessage(msg);
-                }
-            case 'GET_ALL_TABS':
-                {
-                    const msg = await getAllTabs();
-                    return port.postMessage(msg);
-                }
-            default:
-                console.warn(`Unknown action [action=${JSON.stringify(action)}]`);
-        }
-    } catch (err) {
-        console.error(`Bad message payload [err=${err}, msg=${msg.payload}]`);
-    }
-});
 const getActiveTab = async ()=>{
     const tabs = await browser.tabs.query({
         currentWindow: true,
@@ -574,9 +544,57 @@ const getAllTabs = async ()=>{
     });
     return tabs.map(fromBrowserTab);
 };
-browser.browserAction.onClicked.addListener(async ()=>{
-    console.warn('TABS', await getAllTabs());
-});
+const openTab = async (p)=>{
+    const tab = p.tabId && await browser.tabs.get(parseInt(p.tabId, 10));
+    if (tab) browser.tabs.update(tab.id, {
+        active: true
+    });
+    else browser.tabs.create({
+        url: p.url
+    });
+    return {
+    };
+};
+const searchFor = async (p)=>{
+    browser.search.search({
+        query: p
+    });
+    return {
+    };
+};
+const actionsRepo = {
+    GET_ACTIVE_TAB: getActiveTab,
+    GET_ALL_TABS: getAllTabs,
+    OPEN_TAB: openTab,
+    SEARCH_FOR: searchFor
+};
+const init = ()=>{
+    const port = browser.runtime.connectNative('spookfox');
+    port.onDisconnect.addListener((p)=>{
+        console.log('Disconnected from Native APP');
+        if (p.error) console.error('Disconnected due to error', p.error);
+    });
+    port.onMessage.addListener(async (msg)=>{
+        if (!msg.payload) {
+            console.warn('Unknown message:', msg);
+            return;
+        }
+        try {
+            const action = JSON.parse(msg.payload);
+            const executioner = actionsRepo[action.type];
+            if (executioner) {
+                const msg = await executioner(action.payload);
+                return port.postMessage(msg);
+            } else console.warn(`Unknown action [action=${JSON.stringify(action)}]`);
+        } catch (err) {
+            console.error(`Bad message payload [err=${err}, msg=${msg.payload}]`);
+        }
+    });
+    browser.browserAction.onClicked.addListener(async ()=>{
+        console.warn('TABS', await getAllTabs());
+    });
+};
+init();
 
 },{}]},["iD2xH","6FKGH"], "6FKGH", "parcelRequirecb8f")
 
