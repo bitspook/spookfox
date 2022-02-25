@@ -185,9 +185,13 @@ make changes."
   "Prompt user to select a tab and open it in spookfox browser."
   (interactive)
   (let ((tab (sf--tab-read)))
-    (if (sf--tab-p tab)
-        (sf--send-action "OPEN_TAB" tab)
-      (sf--send-action "SEARCH_FOR" tab))))
+    (cond
+     ((sf--tab-p tab)
+      (sf--send-action "OPEN_TAB" tab))
+     ((string-match "https?:\/\/.*[\.].*" tab)
+      (sf--send-action "OPEN_TAB" `(:url ,tab)))
+     (t
+      (sf--send-action "SEARCH_FOR" tab)))))
 
 (provide 'spookfox)
 ;;; spookfox.el ends here
