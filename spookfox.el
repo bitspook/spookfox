@@ -24,6 +24,9 @@
 (defvar spookfox-saved-tabs-target nil
   "Target parse-able by org-capture-template where browser tabs will be saved.")
 
+(defvar sf--tab-history nil
+  "History of accessing spookfox tabs.")
+
 (defun sf--process-output-filter (_process output)
   "Save OUTPUT of last action sent to spookfox PROCESS.
 For now let's only keep track of the last message. If it the
@@ -77,9 +80,10 @@ exit condition in recursive re-checks."
        (plist-get (json-parse-string msg-str :object-type 'plist) :payload)
        :object-type 'plist))))
 
-(defun sf--send-action (action)
-  "Utility to send ACTION type messages."
-  (sf--send-message `((type . ,action))))
+(defun sf--send-action (action &optional payload)
+  "Utility to send ACTION type messages, and optionally a PAYLOAD."
+  (sf--send-message `((type . ,action)
+                      (payload . ,payload))))
 
 (defun sf--get-active-tab ()
   "Get details of active tab in browser."
@@ -108,6 +112,17 @@ This function is useful for `org-map-entries`."
       :url ,(alist-get "URL" props nil nil #'string=)
       :tabId ,(alist-get "TAB_ID" props nil nil #'string=))))
 
+(defun sf--textify-plist (pl title-prop)
+  "Convert PL plist to text obtained by TITLE-PROP property.
+
+All the plist's properties are put on the resultant text as
+text-properties."
+  (let ((text (plist-get pl title-prop)))
+    (cl-dolist (p pl)
+      (when (and (keywordp p) (not (eq title-prop p)))
+        (put-text-property 0 1 p (plist-get pl p) text)))
+    text))
+
 (defun sf--save-tabs ()
   "Save spookfox tabs as an `org-mode` subtree.
 Tabs subtree is saved in `spokfox-saved-tabs-target`"
@@ -131,6 +146,28 @@ TAB_ID is discarded."
         (widen)))
     (seq-filter (lambda (tab) (plist-get tab :tabId)) tabs)))
 
+(defun sf--tab-read ()
+  "Ask user to select a tab using Emacs' completion system."
+  (let* ((tabs (mapcar
+                (lambda (pl)
+                  (cons
+                   (concat (plist-get pl :title) "\t\t(" (plist-get pl :url) ")" "[" (plist-get pl :tabId) "]")
+                   pl))
+                (sf--get-saved-tabs)))
+         (annotation-function nil)
+         (tab (completing-read
+               "Open tab in browser: "
+               (lambda (string pred action)
+                 (if (eq action 'metadata)
+                     `(metadata
+                       (display-sort-function . identity)
+                       (cycle-sort-function . identity)
+                       (annotation-function . ,annotation-function)
+                       (category . spookfox-tab))
+                   (complete-with-action action tabs string pred)))
+               nil t nil 'sf--tab-history)))
+    (cdr (assoc tab tabs))))
+
 ;; Public interface
 (defun spookfox-save-all-tabs ()
   "Save all currently open browser tabs at `spookfox-saved-tabs-target`.
@@ -139,8 +176,11 @@ make changes."
   (interactive)
   (sf--save-tabs))
 
-(defun spookfox-open-saved-tab ()
-  "Select and open a browser tab from saved tabs.")
+(defun spookfox-open-tab ()
+  "Prompt user to select a tab and open it in spookfox browser."
+  (interactive)
+  (let ((tab (sf--tab-read)))
+    (sf--send-action "OPEN_TAB" tab)))
 
 (provide 'spookfox)
 ;;; spookfox.el ends here
