@@ -30,6 +30,13 @@ Communicate between Firefox and Emacs. Because [[https://nyxt.atlas.engineer/][N
    Note: This will not close open tabs in browser. You can have that pleasure
    yourself.
 
+   *Organize tabs into groups*
+
+   It is possible to create "tab groups" using org-mode tags. Applying a tag on
+   a tab node will make it a member of that tab group. Since the org subtree of
+   tabs can be organized in any hierarchy, you can use this to apply a tag on
+   multiple tabs.
+
 2. Open a saved tab
 
    Once you have saved the gazillion tabs you had open in your browser, you can
@@ -55,7 +62,18 @@ Communicate between Firefox and Emacs. Because [[https://nyxt.atlas.engineer/][N
        opened. Else a search with your configured search engine is performed in
        the new tab.
 
-3. Get active tab
+3. Open a tab group
+
+   You can open a group of tabs using =spookfox-open-tab-group=. It will open
+   all the tabs that belong to the group in current browser. If a tab is already
+   open, it is not reopened but will be awoken if it is in discarded state
+   (browsers do that to save resources).
+
+   #+begin_src elisp
+     (spookfox-open-tab-group)
+   #+end_src
+
+4. Get active tab
 
   #+begin_src elisp
   (sf--get-active-tab)

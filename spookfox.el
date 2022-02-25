@@ -21,11 +21,14 @@
 (defvar sf--last-action-output nil
   "Output produced by last spookfox action.")
 
-(defvar spookfox-saved-tabs-target nil
+(defvar spookfox-saved-tabs-target '(file+headline (expand-file-name "spookfox.org" org-directory) "Tabs")
   "Target parse-able by org-capture-template where browser tabs will be saved.")
 
 (defvar sf--tab-history nil
   "History of accessing spookfox tabs.")
+
+(defvar sf--tab-group-history nil
+  "History of accessing spookfox tab groups.")
 
 (defun sf--process-output-filter (_process output)
   "Save OUTPUT of last action sent to spookfox PROCESS.
@@ -90,7 +93,7 @@ exit condition in recursive re-checks."
   (sf--send-action "GET_ACTIVE_TAB")
   (sf--get-last-message))
 
-(defun sf--get-all-tabs ()
+(defun sf--request-all-tabs ()
   "Get all tabs currently present in browser."
   (sf--send-action "GET_ALL_TABS")
   (sf--get-last-message))
@@ -110,7 +113,8 @@ This function is useful for `org-map-entries`."
   (let ((props (org-entry-properties)))
     `(:title ,(alist-get "ITEM" props nil nil #'string=)
       :url ,(alist-get "URL" props nil nil #'string=)
-      :tabId ,(alist-get "TAB_ID" props nil nil #'string=))))
+      :tabId ,(alist-get "TAB_ID" props nil nil #'string=)
+      :tags ,(mapcar #'substring-no-properties (org-get-tags)))))
 
 (defun sf--textify-plist (pl title-prop)
   "Convert PL plist to text obtained by TITLE-PROP property.
@@ -126,7 +130,7 @@ text-properties."
 (defun sf--save-tabs ()
   "Save spookfox tabs as an `org-mode` subtree.
 Tabs subtree is saved in `spokfox-saved-tabs-target`"
-  (let* ((tabs (sf--get-all-tabs))
+  (let* ((tabs (sf--request-all-tabs))
          (tabs-subtree (seq-mapcat #'sf--serialize-tab tabs 'string)))
     (org-capture-set-target-location spookfox-saved-tabs-target)
     (org-capture-put :template tabs-subtree)
@@ -192,6 +196,22 @@ make changes."
       (sf--send-action "OPEN_TAB" `(:url ,tab)))
      (t
       (sf--send-action "SEARCH_FOR" tab)))))
+
+(defun spookfox-open-tab-group ()
+  "Prompt user to select a tab group, and open all tabs in it."
+  (interactive)
+  (let* ((tabs (sf--get-saved-tabs))
+         (groups (seq-uniq (seq-mapcat (lambda (tab) (plist-get tab :tags)) tabs)))
+         (selected-group (completing-read "Select tab group: " groups nil t nil sf--tab-group-history))
+         (group-tabs (seq-filter (lambda (tab) (seq-contains-p (plist-get tab :tags) selected-group #'string=)) tabs)))
+    (sf--send-action
+     "OPEN_TABS"
+     (json-parse-string                 ; json-encode kinda messes up converting list
+                                        ; of plists; so we make proper
+                                        ; json-string, parses it to hashmap so
+                                        ; sf--send-action can parse it again
+                                        ; into a proper JSON array
+      (concat "[" (string-join (mapcar #'json-encode group-tabs) ",") "]")))))
 
 (provide 'spookfox)
 ;;; spookfox.el ends here

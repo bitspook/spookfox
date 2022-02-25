@@ -7,11 +7,17 @@ interface SFMessage {
 interface OpenTabActionPayload {
   url?: string;
   tabId?: string; // It should be a number, but JSON.parse(payload) don't convert it. Let's go with it being a string for now.
+  tags?: string[];
 }
 
 type SearchActionPayload = string;
 
-type ActionPayload = OpenTabActionPayload | SearchActionPayload;
+type OpenTabsActionPayload = OpenTabActionPayload[];
+
+type ActionPayload =
+  | OpenTabActionPayload
+  | SearchActionPayload
+  | OpenTabsActionPayload;
 
 interface SFAction {
   type: string;
@@ -59,13 +65,24 @@ const getAllTabs = async () => {
 };
 
 const openTab = async (p: OpenTabActionPayload) => {
-  const tab = p.tabId && (await browser.tabs.get(parseInt(p.tabId, 10)));
+  let tab = null;
+  try {
+    tab = p.tabId && (await browser.tabs.get(parseInt(p.tabId, 10)));
+  } catch (err) {
+    // pass
+  }
 
   if (tab) {
     browser.tabs.update(tab.id, { active: true });
   } else {
     browser.tabs.create({ url: p.url });
   }
+
+  return {};
+};
+
+const openTabs = async (tabs: OpenTabsActionPayload) => {
+  tabs.forEach(openTab);
 
   return {};
 };
@@ -82,6 +99,7 @@ const actionsRepo: {
   GET_ACTIVE_TAB: getActiveTab,
   GET_ALL_TABS: getAllTabs,
   OPEN_TAB: openTab,
+  OPEN_TABS: openTabs,
   SEARCH_FOR: searchFor,
 };
 
@@ -96,6 +114,11 @@ const init = () => {
   });
 
   port.onMessage.addListener(async (msg: SFMessage) => {
+    if (msg.type === 'Error') {
+      console.error('spookfox-native faced an error, [err=', msg.payload, ']');
+      return;
+    }
+
     if (!msg.payload) {
       console.warn('Unknown message:', msg);
       return;
