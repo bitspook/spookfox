@@ -88,7 +88,7 @@ exit condition in recursive re-checks."
   (sf--send-message `((type . ,action)
                       (payload . ,payload))))
 
-(defun sf--get-active-tab ()
+(defun sf--request-active-tab ()
   "Get details of active tab in browser."
   (sf--send-action "GET_ACTIVE_TAB")
   (sf--get-last-message))
@@ -127,11 +127,10 @@ text-properties."
         (put-text-property 0 1 p (plist-get pl p) text)))
     text))
 
-(defun sf--save-tabs ()
-  "Save spookfox tabs as an `org-mode` subtree.
+(defun sf--save-tabs (tabs)
+  "Save spookfox TABS as an `org-mode` subtree.
 Tabs subtree is saved in `spokfox-saved-tabs-target`"
-  (let* ((tabs (sf--request-all-tabs))
-         (tabs-subtree (seq-mapcat #'sf--serialize-tab tabs 'string)))
+  (let* ((tabs-subtree (seq-mapcat #'sf--serialize-tab tabs 'string)))
     (org-capture-set-target-location spookfox-saved-tabs-target)
     (org-capture-put :template tabs-subtree)
     (org-capture-place-template)))
@@ -174,7 +173,7 @@ TAB_ID is discarded."
         tab)))
 
 (defun sf--tab-p (tab)
-  "Returns `t' if TAB is a spookfox tab, `nil' otherwise."
+  "Return t if TAB is a spookfox tab, nil otherwise."
   (when (plist-get tab :tabId) t))
 
 ;; Public interface
@@ -183,7 +182,14 @@ TAB_ID is discarded."
 It will open a capture buffer so user get a chance to preview and
 make changes."
   (interactive)
-  (sf--save-tabs))
+  (let ((tabs (sf--request-all-tabs)))
+    (sf--save-tabs tabs)))
+
+(defun spookfox-save-active-tab ()
+  "Save active tab in browser."
+  (interactive)
+  (let ((tab (sf--request-active-tab)))
+    (sf--save-tabs (list tab))))
 
 (defun spookfox-open-tab ()
   "Prompt user to select a tab and open it in spookfox browser."
