@@ -6,7 +6,7 @@ interface SFMessage {
 
 interface OpenTabActionPayload {
   url?: string;
-  tabId?: string; // It should be a number, but JSON.parse(payload) don't convert it. Let's go with it being a string for now.
+  tab_id?: string; // It should be a number, but JSON.parse(payload) don't convert it. Let's go with it being a string for now.
   tags?: string[];
 }
 
@@ -20,15 +20,15 @@ type ActionPayload =
   | OpenTabsActionPayload;
 
 interface SFAction {
-  type: string;
+  action: string;
   payload: ActionPayload;
 }
 
 interface Tab {
-  id: number;
+  tab_id: number;
   title: string;
   url: string;
-  isPinned: boolean;
+  is_pinned: boolean;
 }
 
 interface SFErrorMessage {
@@ -42,10 +42,10 @@ type ActionResult = Result<ActionResponse>;
 
 const fromBrowserTab = (tab: browser.tabs.Tab): Tab => {
   return {
-    id: tab.id,
+    tab_id: tab.id,
     title: tab.title,
     url: tab.url,
-    isPinned: tab.pinned,
+    is_pinned: tab.pinned,
   };
 };
 
@@ -67,7 +67,7 @@ const getAllTabs = async () => {
 const openTab = async (p: OpenTabActionPayload) => {
   let tab = null;
   try {
-    tab = p.tabId && (await browser.tabs.get(parseInt(p.tabId, 10)));
+    tab = p.tab_id && (await browser.tabs.get(parseInt(p.tab_id, 10)));
   } catch (err) {
     // pass
   }
@@ -106,6 +106,15 @@ const actionsRepo: {
 const init = () => {
   const port = browser.runtime.connectNative('spookfox');
 
+  const sendAction = (action, payload) => {
+    const actionMsg: SFAction = {
+      action,
+      payload,
+    };
+
+    port.postMessage(actionMsg);
+  };
+
   port.onDisconnect.addListener((p) => {
     console.log('Disconnected from Native APP');
     if (p.error) {
@@ -126,7 +135,7 @@ const init = () => {
 
     try {
       const action: SFAction = JSON.parse(msg.payload);
-      const executioner = actionsRepo[action.type];
+      const executioner = actionsRepo[action.action];
 
       if (executioner) {
         const msg = await executioner(action.payload);
@@ -137,6 +146,15 @@ const init = () => {
     } catch (err) {
       console.error(`Bad message payload [err=${err}, msg=${msg.payload}]`);
     }
+  });
+
+  browser.pageAction.onClicked.addListener(async (tab) => {
+    sendAction('CHAIN_TAB', fromBrowserTab(tab));
+
+    return browser.pageAction.setIcon({
+      tabId: tab.id,
+      path: 'icons/chained-light.svg',
+    });
   });
 
   browser.browserAction.onClicked.addListener(async () => {

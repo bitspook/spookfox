@@ -43,9 +43,10 @@ browser is received.")
 (defun sf--add-action (action executioner)
   "Run EXECUTIONER every time ACTION is received from browser."
   (let ((cell (assoc action sf--actions-alist #'string=)))
-    (if (not cell)
-        (push (cons action (list executioner)) sf--actions-alist)
-      (push executioner (cdr cell)))))
+    (when (or (not cell) (not (seq-contains-p (cdr cell) executioner)))
+      (if (not cell)
+          (push (cons action (list executioner)) sf--actions-alist)
+        (push executioner (cdr cell))))))
 
 (defun sf--process-output-filter (_process output)
   "Save OUTPUT of last action sent to spookfox PROCESS.
@@ -54,9 +55,15 @@ communication b/w browser and Emacs gets noisier, we'll introduce
 a request-id system to keep track of requests and their
 responses, and maintain a data structure."
   (message "Spookfox message: %s"  output)
-  (let ((msg (json-parse-string
-              (plist-get (json-parse-string output :object-type 'plist) :payload)
-              :object-type 'plist)))
+  (let ((msg (mapcar
+              (lambda (x)
+                (cond
+                 ((eq x :false) nil)
+                 ((eq x :true) t)
+                 (t x)))
+              (json-parse-string
+               (plist-get (json-parse-string output :object-type 'plist) :payload)
+               :object-type 'plist))))
     (if (plist-get msg :action)
         (sf--exec-action msg)
       (setq sf--last-action-output msg))))
@@ -241,6 +248,15 @@ PATCH is a plist of properties to upsert."
 (defun sf--tab-p (tab)
   "Return t if TAB is a spookfox tab, nil otherwise."
   (when (plist-get tab :tab_id) t))
+
+(defun sf--on-chain-tab (action)
+  "Executioner for CHAIN_TAB ACTION."
+  (let ((tab (plist-get action :payload)))
+    (if tab
+        (sf--update-tab (plist-get tab :tab_id) '(:chained "t"))
+      (sf--save-tabs (list (plist-put tab :chained t))))))
+
+(sf--add-action "CHAIN_TAB" #'sf--on-chain-tab)
 
 ;; Public interface
 (defun spookfox-save-all-tabs ()

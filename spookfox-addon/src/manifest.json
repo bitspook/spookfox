@@ -1,5 +1,4 @@
 {
-
   "description": "Native messaging example add-on",
   "manifest_version": 2,
   "name": "Spookfox",
@@ -19,9 +18,22 @@
     "scripts": ["./background.ts"]
   },
 
+  "page_action": {
+    "default_icon": "icons/unchained-light.svg",
+    "default_title": "Chain/Unchain with Spookfox",
+    "show_matches": ["<all_urls>"]
+  },
+
   "browser_action": {
     "default_icon": "icons/message.svg"
   },
+
+  "web_accessible_resources": [
+    "icons/chained-light.svg",
+    "icons/chained-dark.svg",
+    "icons/unchained-light.svg",
+    "icons/unchained-dark.svg"
+  ],
 
   "permissions": ["nativeMessaging", "tabs", "search"]
 }

@@ -2,3 +2,4 @@
 /.log/
 node_modules
 .parcel-cache
+spookfox-addon/dist/
