@@ -125,18 +125,27 @@ exit condition in recursive re-checks."
   (concat "* "
           (plist-get tab :title)
           "\n:PROPERTIES:\n"
-          ":TAB_ID:\t" (format "%d" (plist-get tab :id)) "\n"
-          ":URL:\t" (plist-get tab :url) "\n"
+          (seq-reduce (lambda (accum prop)
+                        (when (and (keywordp prop) (not (seq-contains-p '(:title :tags) prop)))
+                          (setq accum (concat (or accum "") (format "%s:\t" prop) (format "%s\n" (plist-get tab prop)))))
+                        accum)
+                      tab "")
           ":END:\n"))
+
+(defvar sf--known-tab-props '("tab_id" "url" "chained" "id")
+  "List of properties which are read when an org node is converted to a tab.")
 
 (defun sf--deserialize-tab ()
   "Return browser tab for subtree at point.
 This function is useful for `org-map-entries`."
   (let ((props (org-entry-properties)))
     `(:title ,(alist-get "ITEM" props nil nil #'string=)
-      :url ,(alist-get "URL" props nil nil #'string=)
-      :tabId ,(alist-get "TAB_ID" props nil nil #'string=)
-      :tags ,(mapcar #'substring-no-properties (org-get-tags)))))
+             :tags ,(mapcar #'substring-no-properties (org-get-tags))
+             ,@(seq-reduce (lambda (accum cell)
+                             (when (seq-contains-p sf--known-tab-props (downcase (car cell)) #'string=) ;; org-mode upcase all the property names
+                               (setq accum (plist-put accum (intern (downcase (format ":%s" (car cell)))) (cdr cell))))
+                             accum)
+                           props nil))))
 
 (defun sf--textify-plist (pl title-prop)
   "Convert PL plist to text obtained by TITLE-PROP property.
@@ -149,34 +158,69 @@ text-properties."
         (put-text-property 0 1 p (plist-get pl p) text)))
     text))
 
-(defun sf--save-tabs (tabs)
+(defun sf--save-tabs (tabs &optional hide-prompt?)
   "Save spookfox TABS as an `org-mode` subtree.
-Tabs subtree is saved in `spokfox-saved-tabs-target`"
-  (let* ((tabs-subtree (seq-mapcat #'sf--serialize-tab tabs 'string)))
-    (org-capture-set-target-location spookfox-saved-tabs-target)
-    (org-capture-put :template tabs-subtree)
-    (org-capture-place-template)))
+Tabs subtree is saved in `spokfox-saved-tabs-target`. Capture
+buffer is not shown if HIDE-PROMPT? is non-nil."
+  (let* ((tabs-subtree (seq-mapcat #'sf--serialize-tab tabs 'string))
+         (org-capture-templates
+          `(("t"
+             "Spookfox tabs"
+             entry
+             ,spookfox-saved-tabs-target
+             ,tabs-subtree
+             :unnarrowed t
+             :immidiate-finish ,(not hide-prompt?)))))
+    (org-capture nil "t")))
+
+(defmacro sf--with-tabs-subtree (&rest body)
+  "Run BODY with current buffer set and narrowed to tabs org subtree.
+Content of the `current-buffer' will be the complete tabs
+subtree, not just the valid tabs. If you change `current-buffer',
+you need to save it."
+  `(let (res)
+     (org-capture-set-target-location spookfox-saved-tabs-target)
+     (save-excursion
+       (with-current-buffer (org-capture-get :buffer)
+         (goto-char (org-capture-get :pos))
+         (org-narrow-to-subtree)
+         (setq res (progn ,@body))
+         (widen)))
+     res))
 
 (defun sf--get-saved-tabs ()
   "Get browser tabs saved with spookfox.
 Returns a list of tabs as plists. Any subtree which don't have a
 TAB_ID is discarded."
-  (let ((tabs nil))
-    (org-capture-set-target-location spookfox-saved-tabs-target)
-    (save-excursion
-      (with-current-buffer (org-capture-get :buffer)
-        (goto-char (org-capture-get :pos))
-        (org-narrow-to-subtree)
-        (setq tabs (org-map-entries #'sf--deserialize-tab))
-        (widen)))
-    (seq-filter (lambda (tab) (plist-get tab :tabId)) tabs)))
+  (seq-filter
+   #'sf--tab-p
+   (sf--with-tabs-subtree
+    (org-map-entries #'sf--deserialize-tab))))
+
+(defun sf--update-tab (tab-id patch)
+  "Update a saved tab matching TAB-ID with PATCH.
+PATCH is a plist of properties to upsert."
+  (sf--with-tabs-subtree
+   (org-map-entries
+    (lambda ()
+      (when (string= (format "%s" tab-id) (org-entry-get (point) "TAB_ID"))
+        (while patch
+          (let ((prop (upcase (substring (symbol-name (pop patch)) 1)))
+                (val (pop patch)))
+            (cond
+             ((string= "TAGS" prop)
+              (org-set-tags val))
+             ((string= "TITLE" prop)
+              (org-edit-headline val))
+             (t (org-entry-put (point) prop val)))))
+        (save-buffer))))))
 
 (defun sf--tab-read ()
   "Ask user to select a tab using Emacs' completion system."
   (let* ((tabs (mapcar
                 (lambda (pl)
                   (cons
-                   (concat (plist-get pl :title) "\t\t(" (plist-get pl :url) ")" "[" (plist-get pl :tabId) "]")
+                   (concat (plist-get pl :title) "\t\t(" (plist-get pl :url) ")" "[" (plist-get pl :tab_id) "]")
                    pl))
                 (sf--get-saved-tabs)))
          (annotation-function nil)
@@ -196,7 +240,7 @@ TAB_ID is discarded."
 
 (defun sf--tab-p (tab)
   "Return t if TAB is a spookfox tab, nil otherwise."
-  (when (plist-get tab :tabId) t))
+  (when (plist-get tab :tab_id) t))
 
 ;; Public interface
 (defun spookfox-save-all-tabs ()
