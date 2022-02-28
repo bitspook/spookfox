@@ -30,22 +30,46 @@
 (defvar sf--tab-group-history nil
   "History of accessing spookfox tab groups.")
 
+(defvar sf--actions-alist nil
+  "A mapping of spookfox actions to functions.
+Alist representing functions to call when an action from spookfox
+browser is received.")
+
+(defun sf--exec-action (action)
+  "Execute ACTION sent from spookfox browser."
+  (cl-dolist (executioner (cdr (assoc (plist-get action :action) sf--actions-alist #'string=)))
+    (funcall executioner action)))
+
+(defun sf--add-action (action executioner)
+  "Run EXECUTIONER every time ACTION is received from browser."
+  (let ((cell (assoc action sf--actions-alist #'string=)))
+    (if (not cell)
+        (push (cons action (list executioner)) sf--actions-alist)
+      (push executioner (cdr cell)))))
+
 (defun sf--process-output-filter (_process output)
   "Save OUTPUT of last action sent to spookfox PROCESS.
 For now let's only keep track of the last message. If it the
 communication b/w browser and Emacs gets noisier, we'll introduce
 a request-id system to keep track of requests and their
 responses, and maintain a data structure."
-  (setq sf--last-action-output output))
+  (message "Spookfox message: %s"  output)
+  (let ((msg (json-parse-string
+              (plist-get (json-parse-string output :object-type 'plist) :payload)
+              :object-type 'plist)))
+    (if (plist-get msg :action)
+        (sf--exec-action msg)
+      (setq sf--last-action-output msg))))
 
 (defun sf--connect ()
   "Connect or re-connect to spookfox browser addon."
-  (setq sf--connection (make-network-process
-                        :name "spookfox"
-                        :buffer "*spookfox*"
-                        :family 'local
-                        :remote "/tmp/spookfox.socket"))
-  (set-process-filter sf--connection #'sf--process-output-filter))
+  (when (or (not sf--connection) (eq (process-status sf--connection) 'closed))
+    (setq sf--connection (make-network-process
+                          :name "spookfox"
+                          :buffer "*spookfox*"
+                          :family 'local
+                          :remote "/tmp/spookfox.socket"))
+    (set-process-filter sf--connection #'sf--process-output-filter)))
 
 (defun sf--build-message (msg)
   "Create a message from MSG which can be sent over to spookfox browser addon."
@@ -63,40 +87,38 @@ MSG will be json encoded before sending."
     (sf--connect))
   (process-send-string sf--connection (sf--build-message msg)))
 
-(defun sf--get-last-message (&optional call-count)
+(defun sf--poll-last-msg-payload (&optional call-count)
   "Synchronously provide latest message received from browser.
 Returns a plist obtained be decoding incoming message. Since
 socket-communication with spookfox is async, this function blocks
 Emacs for 1 second. If it don't receive a response in that time,
 it returns `nil`. CALL-COUNT is for internal use, for reaching
 exit condition in recursive re-checks."
-  (cl-block sf--get-last-message
-    (let ((msg-str sf--last-action-output)
+  (cl-block sf--poll-last-msg-payload
+    (let ((msg sf--last-action-output)
           (call-count (or call-count 0)))
       (when (> call-count 5)
-        (cl-return-from sf--get-last-message))
-      (when (not msg-str)
+        (cl-return-from sf--poll-last-msg-payload))
+      (when (not msg)
         (sleep-for 0 200)
-        (cl-return-from sf--get-last-message (sf--get-last-message (1+ call-count))))
+        (cl-return-from sf--poll-last-msg-payload (sf--poll-last-msg-payload (1+ call-count))))
       (setq sf--last-action-output nil)
-      (json-parse-string
-       (plist-get (json-parse-string msg-str :object-type 'plist) :payload)
-       :object-type 'plist))))
+      msg)))
 
 (defun sf--send-action (action &optional payload)
   "Utility to send ACTION type messages, and optionally a PAYLOAD."
-  (sf--send-message `((type . ,action)
+  (sf--send-message `((action . ,action)
                       (payload . ,payload))))
 
 (defun sf--request-active-tab ()
   "Get details of active tab in browser."
   (sf--send-action "GET_ACTIVE_TAB")
-  (sf--get-last-message))
+  (sf--poll-last-msg-payload))
 
 (defun sf--request-all-tabs ()
   "Get all tabs currently present in browser."
   (sf--send-action "GET_ALL_TABS")
-  (sf--get-last-message))
+  (sf--poll-last-msg-payload))
 
 (defun sf--serialize-tab (tab)
   "Convert browser TAB to org-mode-subtree string."
