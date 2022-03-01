@@ -2,7 +2,87 @@
 
 Communicate between Firefox and Emacs. Because [[https://nyxt.atlas.engineer/][Nyxt]] is just not there yet.
 
-** Features
+#+begin_quote
+Caution: Spookfox is in early development and I am making breaking changes all
+over the place.
+#+end_quote
+
+#+begin_quote
+*Windows is not supported right now.* At this stage I can only test spookfox on
+Linux, but it should theoretically work with Mac as well.
+#+end_quote
+
+** Installation
+
+Since I haven't figured out convenient packaging yet, please do the following
+manual steps to set things up. I am going to assume you are on a Linux machine,
+and have cloned this repo.
+
+*** Setup
+
+**** Without Nix
+
+If you don't have [[https://nixos.org/][Nix]] installed, you will need to make sure that following
+software are available in your =$PATH=.
+
+1. Cargo, for building spookfox Native
+2. Node.js, for building the spookfox add-on
+
+**** With Nix
+
+If you have Nix installed, you can just do =nix-shell= to drop into an already
+setup development environment. Or if you are using [[https://direnv.net/][direnv]], just do a =direnv
+allow= to achieve the same.
+
+*** Install spookfox-native
+
+1. =cd spookfox-native=
+2. =cargo build=
+3. =ln -s <path-to-spookfox>/spookfox-native/spookfox.json ~/.mozilla/native-messaging-hosts/=
+
+Make sure to replace ~<path-to-spookfox>~ in #3 above with where you've cloned
+the repo.
+
+*** Install the addon
+
+1. =cd spookfox-addon=
+2. =yarn=
+3. =yarn build=
+4. Install in Firefox
+   1. Open Firefox
+   2. Go to [[about:addons][about:addons]]
+   3. Click on the gear icon and select "*Debug Add-Ons*"
+   4. Click on "*Load Temporary Add-on*" button
+   5. Navigate to the =spookfox-addon/dist= directory, and click =Open=
+
+*** Install spookfox.el
+
+**** Using straight.el
+
+Since spookfox is in early development, it is not release on Melpa yet. You can
+use straight.el to install it directly from where you've clone this repo.
+
+#+begin_src elisp
+  (use-package spookfox
+    :straight (spookfox :type git
+                        :local-repo "~/Documents/work/spookfox"
+                        :file "spookfox.el")
+    :config
+    (setq spookfox-saved-tabs-target `(file+headline ,(expand-file-name "spookfox.org" org-directory) "Tabs")))
+#+end_src
+
+This is how I install it in [[https://github.com/bitspook/spookmax.d/][my config]].
+
+**** Using =load-file=
+
+You can also simply use
+
+#+begin_src elisp
+  (load-file "<path-to-spookfox>/spookfox.el")
+  (require 'spookfox)
+#+end_src
+
+** features
 
 1. Save all open tabs as org-mode subtrees.
 
