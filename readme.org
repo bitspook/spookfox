@@ -38,7 +38,9 @@ allow= to achieve the same.
 
 1. =cd spookfox-native=
 2. =cargo build=
-3. =ln -s <path-to-spookfox>/spookfox-native/spookfox.json ~/.mozilla/native-messaging-hosts/=
+3. Edit =spookfox-native/spookfox.json= and change =path= property in it to
+   ensure it points to your home directory.
+4. =ln -s <path-to-spookfox>/spookfox-native/spookfox.json ~/.mozilla/native-messaging-hosts/=
 
 Make sure to replace ~<path-to-spookfox>~ in #3 above with where you've cloned
 the repo.
