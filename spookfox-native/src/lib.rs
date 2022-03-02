@@ -1,5 +1,5 @@
 use chrome_native_messaging as cn;
-use serde_json::json;
+use serde_json::{json, Value};
 use std::sync::mpsc;
 use std::{
     io::{self, prelude::*, BufReader},
@@ -7,17 +7,13 @@ use std::{
     os::unix::net::UnixStream,
 };
 
-pub mod types;
+pub mod packet;
 
-use types::*;
+use packet::*;
 
-struct NewSocketConnection {
-    connection: UnixStream,
-}
-
-enum CrossThreadMsgs {
-    SocketCon(NewSocketConnection),
-    SocketMsg(SFMsg),
+enum CrossThreadMsg {
+    Connection(UnixStream),
+    Packet(Packet),
 }
 
 pub fn spawn_socket_server(socket_path: &str) -> io::Result<()> {
@@ -26,6 +22,11 @@ pub fn spawn_socket_server(socket_path: &str) -> io::Result<()> {
     }
 
     let socket = UnixListener::bind(socket_path)?;
+    // Cross-thread communication is needed to keep track of all the clients
+    // that connect to our socket. We can get away with having just 2 open
+    // connections, but for the sake of debugging and future extension, we are
+    // accepting n number of connections, where n is limited by number of
+    // threads OS can open, and number of connections socket can support
     let (tx, rx) = mpsc::channel();
 
     std::thread::spawn(move || {
@@ -33,37 +34,39 @@ pub fn spawn_socket_server(socket_path: &str) -> io::Result<()> {
             if let Ok(stream) = connection {
                 let listener = stream.try_clone().unwrap();
 
-                tx.send(CrossThreadMsgs::SocketCon(NewSocketConnection {
-                    connection: stream,
-                }))
-                .unwrap();
+                tx.send(CrossThreadMsg::Connection(stream)).unwrap();
 
                 let tx = tx.clone();
                 std::thread::spawn(move || {
                     let listener = BufReader::new(&listener);
 
+                    // We have to devise a way to tell where one message ends
+                    // and next starts. Doing so at a new line seems fine since
+                    // our packets are serialized JSON documents
                     listener.lines().into_iter().for_each(|line| {
                         if let Ok(line) = line {
-                            match serde_json::from_str::<SFMsg>(line.trim()) {
-                                Ok(msg) => {
-                                    // We don't care about other communication on
-                                    // the socket. Only messages sent from Emacs
-                                    // should be passed to Browser.
-                                    if let SFComponent::Emacs = msg.sender {
-                                        cn::send!(msg);
-                                    } else {
-                                        tx.send(CrossThreadMsgs::SocketMsg(msg)).unwrap();
-                                    }
-                                }
+                            match serde_json::from_str::<Packet>(line.trim()) {
+                                Ok(msg) => match msg.sender {
+                                    Sender::Emacs => cn::send!(msg),
+                                    Sender::Browser => tx.send(CrossThreadMsg::Packet(msg)).unwrap(),
+                                },
                                 Err(err) => {
-                                    let payload = format!(
+                                    // If a client posts invalid message, like badly
+                                    // crafted packets from Emacs; they are
+                                    // reported back to the browser since it is
+                                    // the primary UI on socket-server side
+                                    // (since it starts the socket server)
+                                    let message = Value::String(format!(
                                         "Received invalid JSON  [err={}, line={}]",
                                         err, line
-                                    );
-                                    let msg = SFMsg {
-                                        msg_type: SFMsgType::Error,
-                                        sender: SFComponent::Native,
-                                        payload,
+                                    ));
+                                    let msg = Packet {
+                                        status: Status::Error,
+                                        // We just assume that sender is Emacs. It might
+                                        // very well be that pesky nc, or its
+                                        // hipster cousin ncat
+                                        sender: Sender::Emacs,
+                                        message,
                                     };
                                     cn::send!(msg)
                                 }
@@ -79,8 +82,8 @@ pub fn spawn_socket_server(socket_path: &str) -> io::Result<()> {
         let mut connections = vec![];
         for msg in rx {
             match msg {
-                CrossThreadMsgs::SocketCon(conn) => connections.push(conn.connection),
-                CrossThreadMsgs::SocketMsg(msg) => {
+                CrossThreadMsg::Connection(conn) => connections.push(conn),
+                CrossThreadMsg::Packet(msg) => {
                     for mut conn in &connections {
                         conn.write_all((json!(msg).to_string() + "\n").as_bytes())?;
                         conn.flush()?;

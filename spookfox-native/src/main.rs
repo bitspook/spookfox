@@ -3,55 +3,30 @@ use cn::send;
 use serde_json::json;
 use std::io::{self, prelude::*, stdin};
 use std::os::unix::net::UnixStream;
-use std::panic;
 
-use spookfox_native::{spawn_socket_server, types::*};
-
-fn handle_panic(info: &std::panic::PanicInfo) {
-    let msg = match info.payload().downcast_ref::<&'static str>() {
-        Some(s) => *s,
-        None => match info.payload().downcast_ref::<String>() {
-            Some(s) => &s[..],
-            None => "Box<Any>",
-        },
-    };
-    send!({
-        "status": "panic",
-        "payload": msg,
-        "file": info.location().map(|l| l.file()),
-        "line": info.location().map(|l| l.line())
-    });
-}
+use spookfox_native::{packet::*, spawn_socket_server};
 
 fn run() -> io::Result<()> {
-    panic::set_hook(Box::new(handle_panic));
-
     let socket_path = "/tmp/spookfox.socket";
 
     spawn_socket_server(socket_path)?;
 
-    let mut stream = UnixStream::connect(socket_path)?;
-    loop {
-        match cn::read_input(stdin()) {
-            Err(err) => {
-                if let cn::Error::NoMoreInput = err {
-                    break;
-                }
-                send!({ "error": format!("{}", err) });
+    // We use socket to communicate with ourselves. Every message browser sends
+    // is sent to the socket server as `Sender: Browser`. Socket server then
+    // decides what to do with it, which is usually broadcasting to all
+    // connected clients (including Emacs).
+    let mut socket = UnixStream::connect(socket_path)?;
 
-                let msg = format!("{}", err);
-                let msg = SFMsg::from_browser(msg, true);
-                stream.write_all(msg.as_bytes())?;
-                stream.flush()?;
-            }
-            Ok(val) => {
-                let msg = format!("{}", val);
-                let msg = SFMsg::from_browser(msg, false);
+    // Let's ignore any JSON formatting errors from browser
+    while let Ok(val) = cn::read_input(stdin()) {
+        let msg = Packet {
+            status: Status::Success,
+            sender: Sender::Browser,
+            message: val,
+        };
 
-                stream.write_all(msg.as_bytes())?;
-                stream.flush()?;
-            }
-        }
+        socket.write_all((json!(msg).to_string() + "\n").as_bytes())?;
+        socket.flush()?;
     }
 
     Ok(())

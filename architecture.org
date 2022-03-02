@@ -1,0 +1,48 @@
+#+title: Spookfox Software Architecture
+
+Spookfox involves following major parts in terms of a tech stack.
+
+1. *spookfox.el*: Emacs package written in Emacs Lisp
+2. *spookfox-addon*: Firefox extension written in Javascript
+3. *spookfox-native*: Glue code written in Rust
+
+To make the browser extension talk to Emacs, Spookfox uses Native Messaging.
+[[https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Native_messaging][Native Messaging]] require an executable which accepts input from stdin, and
+provides its output at stdout. Emacs itself proved unusable for that purpose.
+That's why spookfox-native was written as glue code which allow communication
+b/w the browser and Emacs.
+
+** Components
+
+Spookfox has 3 primary components:
+
+1. <<sn>> : spookfox-native : Glue code written in Rust
+2. <<sa>> : spookfox-addon : Firefox addon written in Javascript
+3. <<se>> : spookfox-el : Emacs package written in Emacs Lisp
+4. <<ss>> : spookfox-socket : A UNIX socket used for inter-process communication
+   (IPC) b/w [[se]] and [[sn]]
+
+4th is just a file (well socket, but you know what I mean).
+
+** Control Flows
+
+- [[sa]] starts [[sn]] on browser startup.
+
+  [[sn]] is now a running process to which browser communicates via =stdin= and
+  =stdout=. Anything [[sn]] prints become a message [[sa]] receives and tries to
+  interpret as a command.
+
+*** Emacs sending commands to Firefox
+
+- [[sn]] spawns a thread which connects to [[ss]] for messages to/from Emacs
+- [[se]] connects to [[ss]]
+- Emacs receives input from User to execute a command in browser
+- [[se]] create a JSON string (referred to as =msg=) and sends it to [[ss]]
+- [[sn]] reads =msg= on [[ss]]
+- [[sn]] prints the =msg= as-is to stdout, to which [[sa]] is listening
+- [[sa]] receives =msg=
+  - parses it
+  - executes it
+  - post a response back to [[sn]]
+- [[sn]] receives the response from [[sa]] and passes it to [[ss]]
+- [[se]] now has the response (received over [[ss]]) of message it sent to browser
