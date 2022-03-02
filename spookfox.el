@@ -35,6 +35,8 @@
 Alist representing functions to call when an action from spookfox
 browser is received.")
 
+(defvar sf--reconnect-timer nil)
+
 (defun sf--exec-action (action)
   "Execute ACTION sent from spookfox browser."
   (cl-dolist (executioner (cdr (assoc (plist-get action :action) sf--actions-alist #'string=)))
@@ -48,74 +50,111 @@ browser is received.")
           (push (cons action (list executioner)) sf--actions-alist)
         (push executioner (cdr cell))))))
 
-(defun sf--process-output-filter (_process output)
-  "Save OUTPUT of last action sent to spookfox PROCESS.
-For now let's only keep track of the last message. If it the
-communication b/w browser and Emacs gets noisier, we'll introduce
-a request-id system to keep track of requests and their
-responses, and maintain a data structure."
-  (message "Spookfox message: %s"  output)
+(defun sf--process-output-filter (_process pkt-str)
+  "Choose what to do with PKT-STR sent by spookfox-native.
+It try to convert the packet to JSON, and pass it to action
+executioner if it is an action. Otherwise, for now it keep track
+of the last message only. If the communication b/w browser and
+Emacs gets noisier, we'll do something with the request-ids to
+keep track of requests and their responses."
+  (with-current-buffer "*spookfox*" (insert pkt-str))
   (let ((msg (mapcar
               (lambda (x)
                 (cond
+                 ;; because parsing JSON string to plist convert JS true/false
+                 ;; to keywords
                  ((eq x :false) nil)
                  ((eq x :true) t)
                  (t x)))
-              (json-parse-string
-               (plist-get (json-parse-string output :object-type 'plist) :payload)
-               :object-type 'plist))))
+              (plist-get (json-parse-string pkt-str :object-type 'plist) :message))))
     (if (plist-get msg :action)
         (sf--exec-action msg)
       (setq sf--last-action-output msg))))
 
+(defun sf--process-sentinel (_process event)
+  "Start a timer when break-connection EVENT is received."
+  (message (format "Spookfox process had the event: %s" event))
+  (sf--ensure-connection))
+
+(defun sf--is-disconnected ()
+  "Return t if connection to spookfox-native is not established."
+  (or (not sf--connection) (eq (process-status sf--connection) 'closed)))
+
 (defun sf--connect ()
   "Connect or re-connect to spookfox browser addon."
-  (when (or (not sf--connection) (eq (process-status sf--connection) 'closed))
+  (when (sf--is-disconnected)
     (setq sf--connection (make-network-process
                           :name "spookfox"
                           :buffer "*spookfox*"
                           :family 'local
                           :remote "/tmp/spookfox.socket"))
-    (set-process-filter sf--connection #'sf--process-output-filter)))
+    (set-process-filter sf--connection #'sf--process-output-filter)
+    (set-process-sentinel sf--connection #'sf--process-sentinel)
+    (when sf--reconnect-timer
+      (cancel-timer sf--reconnect-timer)
+      (setq sf--reconnect-timer nil))
+    (message "Connected to spookfox!")))
 
-(defun sf--build-message (msg)
-  "Create a message from MSG which can be sent over to spookfox browser addon."
+(defun sf--ensure-connection (&optional retry-count)
+  "Make sure spookfox is connect at all times.
+If spookfox connection is broken, try to re-connect every 10
+seconds until connection is established. RETRY-COUNT tells how
+many retry attempts have already been made, so next wait interval
+is set accordingly."
+  (when (and sf--reconnect-timer (not retry-count)) ;cancel the timer if explicitly called
+    (cancel-timer sf--reconnect-timer)
+    (setq sf--reconnect-timer nil))
+
+  (ignore-errors (sf--connect))
+
+  (let* ((retry-count (or retry-count 0))
+         (retry-after (min (* retry-count 2) 15)))
+    (when (sf--is-disconnected)
+      (when (> retry-after 2) (message "Will retry spookfox connection after %ss" retry-after)) ;so we don't spam for momentary reconnects
+      (setq sf--reconnect-timer (run-with-timer retry-after nil 'sf--ensure-connection (1+ retry-count))) )))
+
+(defun sf--build-packet (msg)
+  "Create a packet from MSG which can be sent over to spookfox-native."
   (concat (json-encode `((sender . "Emacs")
-                         (type . "Success")
-                         (payload . ,(json-encode msg))))
+                         (status . "Success")
+                         (message . ,(json-encode msg))))
           "\n"))
 
 (defun sf--send-message (msg)
   "Send a MSG to browsers connected with spookfox.
-MSG will be json encoded before sending."
+MSG will be JSON encoded before sending. Throws error if
+connection to spookfox-native is not established."
+  (sf--connect)                         ;It's safe to call `sf--connect' since it is idempotent.
+                                        ;This gives us a safety net in case the
+                                        ;timer for re-connection is waiting
   (when (or
          (not sf--connection)
          (string= (process-status sf--connection) "closed"))
-    (sf--connect))
-  (process-send-string sf--connection (sf--build-message msg)))
-
-(defun sf--poll-last-msg-payload (&optional call-count)
-  "Synchronously provide latest message received from browser.
-Returns a plist obtained be decoding incoming message. Since
-socket-communication with spookfox is async, this function blocks
-Emacs for 1 second. If it don't receive a response in that time,
-it returns `nil`. CALL-COUNT is for internal use, for reaching
-exit condition in recursive re-checks."
-  (cl-block sf--poll-last-msg-payload
-    (let ((msg sf--last-action-output)
-          (call-count (or call-count 0)))
-      (when (> call-count 5)
-        (cl-return-from sf--poll-last-msg-payload))
-      (when (not msg)
-        (sleep-for 0 200)
-        (cl-return-from sf--poll-last-msg-payload (sf--poll-last-msg-payload (1+ call-count))))
-      (setq sf--last-action-output nil)
-      msg)))
+    (error "Not connected to spookfox-native"))
+  (process-send-string sf--connection (sf--build-packet msg)))
 
 (defun sf--send-action (action &optional payload)
   "Utility to send ACTION type messages, and optionally a PAYLOAD."
   (sf--send-message `((action . ,action)
                       (payload . ,payload))))
+
+(defun sf--poll-last-msg-payload (&optional retry-count)
+  "Synchronously provide latest message received from browser.
+Returns a plist obtained be decoding incoming message. Since
+socket-communication with spookfox is async, this function blocks
+Emacs for maximum 1 second. If it don't receive a response in
+that time, it returns `nil`. RETRY-COUNT is for internal use, for
+reaching exit condition in recursive re-checks."
+  (cl-block sf--poll-last-msg-payload
+    (let ((msg sf--last-action-output)
+          (retry-count (or retry-count 0)))
+      (when (> retry-count 5)
+        (cl-return-from sf--poll-last-msg-payload))
+      (when (not msg)
+        (sleep-for 0 200)
+        (cl-return-from sf--poll-last-msg-payload (sf--poll-last-msg-payload (1+ retry-count))))
+      (setq sf--last-action-output nil)
+      msg)))
 
 (defun sf--request-active-tab ()
   "Get details of active tab in browser."
@@ -249,14 +288,20 @@ PATCH is a plist of properties to upsert."
   "Return t if TAB is a spookfox tab, nil otherwise."
   (when (plist-get tab :tab_id) t))
 
-(defun sf--on-chain-tab (action)
+(defun sf--handle-chain-tab (action)
   "Executioner for CHAIN_TAB ACTION."
   (let ((tab (plist-get action :payload)))
     (if tab
         (sf--update-tab (plist-get tab :tab_id) '(:chained "t"))
       (sf--save-tabs (list (plist-put tab :chained t))))))
 
-(sf--add-action "CHAIN_TAB" #'sf--on-chain-tab)
+(defun sf--handle-get-saved-tabs (_action)
+  "Executioner for GET_SAVED_TABS ACTION."
+  (let ((tabs (sf--get-saved-tabs)))
+    (sf--send-message tabs)))
+
+(sf--add-action "CHAIN_TAB" #'sf--handle-chain-tab)
+(sf--add-action "GET_SAVED_TABS" #'sf--handle-get-saved-tabs)
 
 ;; Public interface
 (defun spookfox-save-all-tabs ()

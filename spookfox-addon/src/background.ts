@@ -1,6 +1,6 @@
-interface SFMessage {
-  type: 'Success' | 'Error';
-  payload: string;
+interface Packet {
+  status: 'Success' | 'Error';
+  message: string;
   sender: string;
 }
 
@@ -19,7 +19,7 @@ type ActionPayload =
   | SearchActionPayload
   | OpenTabsActionPayload;
 
-interface SFAction {
+interface Action {
   action: string;
   payload: ActionPayload;
 }
@@ -106,8 +106,8 @@ const actionsRepo: {
 const init = () => {
   const port = browser.runtime.connectNative('spookfox');
 
-  const sendAction = (action, payload) => {
-    const actionMsg: SFAction = {
+  const sendAction = (action: string, payload: ActionPayload) => {
+    const actionMsg: Action = {
       action,
       payload,
     };
@@ -122,19 +122,19 @@ const init = () => {
     }
   });
 
-  port.onMessage.addListener(async (msg: SFMessage) => {
-    if (msg.type === 'Error') {
-      console.error('spookfox-native faced an error, [err=', msg.payload, ']');
+  port.onMessage.addListener(async (pkt: Packet) => {
+    if (pkt.status === 'Error') {
+      console.error('spookfox-native faced an error, [err=', pkt.message, ']');
       return;
     }
 
-    if (!msg.payload) {
-      console.warn('Unknown message:', msg);
+    if (!pkt.message) {
+      console.warn('Unknown message:', pkt);
       return;
     }
 
     try {
-      const action: SFAction = JSON.parse(msg.payload);
+      const action: Action = JSON.parse(pkt.message);
       const executioner = actionsRepo[action.action];
 
       if (executioner) {
@@ -144,7 +144,7 @@ const init = () => {
         console.warn(`Unknown action [action=${JSON.stringify(action)}]`);
       }
     } catch (err) {
-      console.error(`Bad message payload [err=${err}, msg=${msg.payload}]`);
+      console.error(`Bad message payload [err=${err}, msg=${pkt.message}]`);
     }
   });
 
