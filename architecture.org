@@ -46,3 +46,18 @@ Spookfox has 3 primary components:
   - post a response back to [[sn]]
 - [[sn]] receives the response from [[sa]] and passes it to [[ss]]
 - [[se]] now has the response (received over [[ss]]) of message it sent to browser
+
+** Glossary
+
+- <<Packet>> :: *Not* a TCP/UDP packet. This is a single message transferred
+  across spookfox-native. It is named as such to emphasize the fact that this is
+  purely a transfer thing, and shouldn't contain any business knowledge. It only
+  has information about what is being transferred, if the transfer was
+  successful, and who is doing the transfer.
+- <<Action>> :: Analogous of a request in most protocols. This is a message one
+  side sends to another, expecting it to do some operation and/or a response.
+  Every action has a unique ID.
+- <<Action-response>> :: Result of performing an action. Since action is
+  originates on one end (e.g [[se]]) and executed at another end (e.g [[sa]]), every
+  action-response contains an =actionId= identifying which action is being
+  responded to.

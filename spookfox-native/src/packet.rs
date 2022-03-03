@@ -14,12 +14,6 @@ pub enum Status {
 }
 
 #[derive(Serialize, Deserialize)]
-pub enum MsgType {
-    Request,
-    Response,
-}
-
-#[derive(Serialize, Deserialize)]
 pub struct Packet {
     pub status: Status,
     pub sender: Sender,

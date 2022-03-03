@@ -11,10 +11,12 @@ fn run() -> io::Result<()> {
 
     spawn_socket_server(socket_path)?;
 
-    // We use socket to communicate with ourselves. Every message browser sends
-    // is sent to the socket server as `Sender: Browser`. Socket server then
-    // decides what to do with it, which is usually broadcasting to all
-    // connected clients (including Emacs).
+    // Here we block the tty because browser native-messaging need us to accept
+    // input at stdin and provide output at stdout. We don't do any other work
+    // here; we take what browser gave us on stdin and send it to the socket
+    // server as `Sender::Browser`. Socket server then decides what to do with
+    // it, which is usually broadcasting to all connected clients (including
+    // Emacs).
     let mut socket = UnixStream::connect(socket_path)?;
 
     // Let's ignore any JSON formatting errors from browser

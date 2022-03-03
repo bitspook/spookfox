@@ -1,3 +1,5 @@
+import { v4 as uuid } from 'uuid';
+
 interface Packet {
   status: 'Success' | 'Error';
   message: string;
@@ -19,7 +21,15 @@ type ActionPayload =
   | SearchActionPayload
   | OpenTabsActionPayload;
 
+type Message = Action | ActionResponse;
+
+interface ActionResponse {
+  actionId: string;
+  payload: any;
+}
+
 interface Action {
+  id: string;
   action: string;
   payload: ActionPayload;
 }
@@ -37,8 +47,7 @@ interface SFErrorMessage {
 }
 
 type Result<R> = SFErrorMessage | R;
-type ActionResponse = object;
-type ActionResult = Result<ActionResponse>;
+type ActionResult = Result<any>;
 
 const fromBrowserTab = (tab: browser.tabs.Tab): Tab => {
   return {
@@ -103,16 +112,62 @@ const actionsRepo: {
   SEARCH_FOR: searchFor,
 };
 
+class ResponseHandler extends EventTarget {
+  responses: { [actionId: string]: ActionResponse } = {};
+
+  addNew(res: ActionResponse) {
+    this.responses[res.actionId] = res;
+    this.dispatchEvent(new Event(res.actionId));
+  }
+
+  waitFor(actionId: string) {
+    return new Promise((resolve, reject) => {
+      const listener = () => {
+        const res = this.responses[actionId];
+        this.responses[actionId] = null;
+        this.removeEventListener(actionId, listener);
+
+        try {
+          resolve(JSON.parse(res.payload));
+        } catch (err) {
+          console.error('Bad response from Emacs. [res=', res, ']');
+          reject(err);
+        }
+      };
+
+      this.addEventListener(actionId, listener);
+    });
+  }
+}
+
 const init = () => {
   const port = browser.runtime.connectNative('spookfox');
+  const responseHandler = new ResponseHandler();
 
-  const sendAction = (action: string, payload: ActionPayload) => {
-    const actionMsg: Action = {
-      action,
+  const sendAction = (name: string, payload?: ActionPayload) => {
+    const action: Action = {
+      id: uuid(),
+      action: name,
       payload,
     };
 
-    port.postMessage(actionMsg);
+    port.postMessage(action);
+
+    return action.id;
+  };
+
+  const handleAction = async (action: Action) => {
+    const executioner = actionsRepo[action.action];
+
+    if (!executioner) {
+      console.warn(`Unknown action [action=${JSON.stringify(action)}]`);
+    }
+
+    const payload = await executioner(action.payload);
+    return port.postMessage({
+      actionId: action.id,
+      payload,
+    });
   };
 
   port.onDisconnect.addListener((p) => {
@@ -134,15 +189,13 @@ const init = () => {
     }
 
     try {
-      const action: Action = JSON.parse(pkt.message);
-      const executioner = actionsRepo[action.action];
+      const msg: Message = JSON.parse(pkt.message);
 
-      if (executioner) {
-        const msg = await executioner(action.payload);
-        return port.postMessage(msg);
-      } else {
-        console.warn(`Unknown action [action=${JSON.stringify(action)}]`);
+      if ((msg as Action).action) {
+        return handleAction(msg as Action);
       }
+
+      return responseHandler.addNew(msg as ActionResponse);
     } catch (err) {
       console.error(`Bad message payload [err=${err}, msg=${pkt.message}]`);
     }
@@ -158,7 +211,10 @@ const init = () => {
   });
 
   browser.browserAction.onClicked.addListener(async () => {
-    console.warn('TABS', await getAllTabs());
+    const actionId = sendAction('GET_SAVED_TABS');
+    const savedTabs = await responseHandler.waitFor(actionId);
+
+    console.warn('SAVED TABS', savedTabs);
   });
 };
 
