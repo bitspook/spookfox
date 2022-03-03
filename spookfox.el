@@ -37,7 +37,7 @@
 Alist representing functions to call when an action from spookfox
 browser is received.")
 
-(defvar sf--known-tab-props '("tab_id" "url" "chained" "id")
+(defvar sf--known-tab-props '("id" "url" "chained" "id")
   "List of properties which are read when an org node is converted to a tab.")
 
 (defvar sf--reconnect-timer nil)
@@ -85,6 +85,9 @@ keep track of actions and their responses."
     (when sf--reconnect-timer
       (cancel-timer sf--reconnect-timer)
       (setq sf--reconnect-timer nil))
+    ;; Let's send a connected event to browser so it can refresh its state when
+    ;; Emacs re-connects for whatever reason.
+    (sf--send-action "CONNECTED")
     (message "Connected to spookfox!")))
 
 (defun spookfox-ensure-connection (&optional retry-count)
@@ -165,14 +168,15 @@ reaching exit condition in recursive re-checks."
 (defun sf--insert-tab (tab)
   "Insert browser TAB as a new org-mode-subtree."
   (org-insert-heading)
-  (org-id-get-create)
-  (while tab
-    (let ((prop (upcase (substring (format "%s" (pop tab)) 1)))
-          (val (pop tab)))
-      (cond
-       ((string= "TITLE" prop) (org-edit-headline val))
-       ((string= "TAGS" prop) (org-set-tags val))
-       (t (org-entry-put (point) prop (format "%s" val)))))))
+  (let ((id (org-id-get-create)))
+    (while tab
+      (let ((prop (upcase (substring (format "%s" (pop tab)) 1)))
+            (val (pop tab)))
+        (cond
+         ((string= "TITLE" prop) (org-edit-headline val))
+         ((string= "TAGS" prop) (org-set-tags val))
+         (t (org-entry-put (point) prop (format "%s" val))))))
+    id))
 
 (defun sf--deserialize-tab ()
   "Return spookfox tab for subtree at point.
@@ -228,36 +232,44 @@ you need to save it."
 (defun sf--get-saved-tabs ()
   "Get browser tabs saved with spookfox.
 Returns a list of tabs as plists. Any subtree which don't have a
-TAB_ID is discarded."
+ID and URL is discarded."
   (seq-filter
    #'sf--tab-p
    (sf--with-tabs-subtree
     (org-map-entries #'sf--deserialize-tab))))
 
+(defun sf--find-tab-with-id (tab-id)
+  "Find tab with TAB-ID."
+  (sf--with-tabs-subtree
+   (let ((pos (org-id-find-id-in-file tab-id (buffer-file-name))))
+     (when pos
+       (goto-char (cdr pos))
+       (sf--deserialize-tab)))))
+
 (defun sf--update-tab (tab-id patch)
   "Update a saved tab matching TAB-ID with PATCH.
 PATCH is a plist of properties to upsert."
   (sf--with-tabs-subtree
-   (org-map-entries
-    (lambda ()
-      (when (string= (format "%s" tab-id) (org-entry-get (point) "TAB_ID"))
-        (while patch
-          (let ((prop (upcase (substring (symbol-name (pop patch)) 1)))
-                (val (pop patch)))
-            (cond
-             ((string= "TAGS" prop)
-              (org-set-tags val))
-             ((string= "TITLE" prop)
-              (org-edit-headline val))
-             (t (org-entry-put (point) prop val)))))
-        (save-buffer))))))
+   (let ((pos (org-id-find-id-in-file tab-id (buffer-file-name))))
+     (when pos
+       (goto-char (cdr pos))
+       (while patch
+         (let ((prop (upcase (substring (symbol-name (pop patch)) 1)))
+               (val (pop patch)))
+           (cond
+            ((string= "TAGS" prop)
+             (org-set-tags val))
+            ((string= "TITLE" prop)
+             (org-edit-headline val))
+            (t (org-entry-put (point) prop val)))))
+       (save-buffer)))))
 
 (defun sf--tab-read ()
   "Ask user to select a tab using Emacs' completion system."
   (let* ((tabs (mapcar
                 (lambda (pl)
                   (cons
-                   (concat (plist-get pl :title) "\t\t(" (plist-get pl :url) ")" "[" (plist-get pl :tab_id) "]")
+                   (concat (plist-get pl :title) "\t\t(" (plist-get pl :url) ")" "[" (plist-get pl :id) "]")
                    pl))
                 (sf--get-saved-tabs)))
          (annotation-function nil)
@@ -277,7 +289,7 @@ PATCH is a plist of properties to upsert."
 
 (defun sf--tab-p (tab)
   "Return t if TAB is a spookfox tab, nil otherwise."
-  (when (plist-get tab :tab_id) t))
+  (when (and (plist-get tab :id) (plist-get tab :url)) t))
 
 (defun sf--exec-action (action)
   "Execute ACTION sent from spookfox browser."
@@ -294,12 +306,17 @@ PATCH is a plist of properties to upsert."
           (push (cons action (list executioner)) sf--actions-alist)
         (push executioner (cdr cell))))))
 
-(defun sf--handle-chain-tab (action)
-  "Executioner for CHAIN_TAB ACTION."
-  (let ((tab (plist-get action :payload)))
-    (if tab
-        (sf--update-tab (plist-get tab :tab_id) '(:chained "t"))
-      (sf--save-tabs (list (plist-put tab :chained t))))))
+(defun sf--handle-toggle-tab-chaining (action)
+  "Executioner for TOGGLE_TAB_CHAINING ACTION."
+  (let* ((tab (plist-get action :payload))
+         (chained? (not (plist-get tab :chained)))
+         (tab-id (plist-get tab :id)))
+    (if tab-id
+        (sf--update-tab tab-id '(:chained (format "%s" chained?)))
+      (setq tab-id (sf--with-tabs-subtree
+                    (goto-char (point-max))
+                    (sf--insert-tab (plist-put tab :chained chained?)))))
+    (sf--find-tab-with-id tab-id)))
 
 (defun sf--handle-get-saved-tabs (_action)
   "Executioner for GET_SAVED_TABS ACTION."
@@ -308,7 +325,7 @@ PATCH is a plist of properties to upsert."
   ;; when we have to deal with list of Tabs
   (json-parse-string (concat "[" (string-join (mapcar #'json-encode (sf--get-saved-tabs)) ",") "]")))
 
-(sf--add-action "CHAIN_TAB" #'sf--handle-chain-tab)
+(sf--add-action "TOGGLE_TAB_CHAINING" #'sf--handle-toggle-tab-chaining)
 (sf--add-action "GET_SAVED_TABS" #'sf--handle-get-saved-tabs)
 
 ;; Public interface

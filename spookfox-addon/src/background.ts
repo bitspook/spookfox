@@ -34,12 +34,11 @@ interface Action {
   payload: ActionPayload;
 }
 
-interface Tab {
-  id?: string; // id exists iff tab is saved in Emacs
-  tab_id: number;
+interface SFTab {
+  id?: string;
   title: string;
   url: string;
-  is_pinned: boolean;
+  chained?: boolean;
 }
 
 interface SFErrorMessage {
@@ -49,16 +48,15 @@ interface SFErrorMessage {
 
 type Result<R> = SFErrorMessage | R;
 
-const fromBrowserTab = (tab: browser.tabs.Tab): Tab => {
+const fromBrowserTab = (tab: OpenTab): SFTab => {
   return {
-    tab_id: tab.id,
+    id: tab.savedTabId,
     title: tab.title,
     url: tab.url,
-    is_pinned: tab.pinned,
   };
 };
 
-const getActiveTab = async (): Promise<Result<Tab>> => {
+const getActiveTab = async (): Promise<Result<SFTab>> => {
   const tabs = await browser.tabs.query({ currentWindow: true, active: true });
   if (!tabs.length) {
     return { type: 'Error', message: 'No active tabs found' };
@@ -67,13 +65,13 @@ const getActiveTab = async (): Promise<Result<Tab>> => {
   return fromBrowserTab(tabs[0]);
 };
 
-const getAllTabs = async (): Promise<Tab[]> => {
+const getAllTabs = async (): Promise<SFTab[]> => {
   const tabs = await browser.tabs.query({ currentWindow: true });
 
   return tabs.map(fromBrowserTab);
 };
 
-const openTab = async (p: OpenTabActionPayload): Promise<Tab> => {
+const openTab = async (p: OpenTabActionPayload): Promise<SFTab> => {
   let tab = null;
   try {
     tab = p.tab_id && (await browser.tabs.get(parseInt(p.tab_id, 10)));
@@ -90,7 +88,7 @@ const openTab = async (p: OpenTabActionPayload): Promise<Tab> => {
   return tab;
 };
 
-const openTabs = async (tabs: OpenTabsActionPayload): Promise<Tab[]> => {
+const openTabs = async (tabs: OpenTabsActionPayload): Promise<SFTab[]> => {
   const openedTabs = await Promise.all(tabs.map(openTab));
 
   return openedTabs;
@@ -102,14 +100,51 @@ const searchFor = async (p: string) => {
   return {};
 };
 
+const handleReconnect = async (_p, socket: SocketMan) => {
+  const savedTabs = (await socket.sendAction('GET_SAVED_TABS')) as SFTab[];
+  const currentTabs = await browser.tabs.query({});
+
+  // Problem: There might be tabs with same URLs
+  // Solution: First open tab in browser is mapped to first tab saved in Emacs.
+  // Catch: Every time this function runs, all current tabs which match urls
+  // saved in Emacs are mapped; regardless of whether user meant it or not.
+  const takenSavedTabIds = [];
+  let openTabs = currentTabs.reduce((accum, tab) => {
+    const savedTab = savedTabs.find(
+      (st) => st.url === tab.url && takenSavedTabIds.indexOf(st.id) === -1
+    );
+    if (savedTab) {
+      takenSavedTabIds.push(savedTab.id);
+      accum[tab.id] = {
+        savedTabId: savedTab.id,
+        ...tab,
+      };
+    } else {
+      accum[tab.id] = tab;
+    }
+
+    return accum;
+  }, {});
+
+  state.openTabs = openTabs;
+  state.savedTabs = savedTabs.reduce((accum, tab) => {
+    accum[tab.id] = tab;
+    return accum;
+  }, {});
+};
+
 const actionsRepo: {
-  [actionType: string]: (payload: ActionPayload) => Promise<Result<any>>;
+  [actionType: string]: (
+    payload: ActionPayload,
+    socket?: SocketMan
+  ) => Promise<Result<any>>;
 } = {
   GET_ACTIVE_TAB: getActiveTab,
   GET_ALL_TABS: getAllTabs,
   OPEN_TAB: openTab,
   OPEN_TABS: openTabs,
   SEARCH_FOR: searchFor,
+  CONNECTED: handleReconnect,
 };
 
 // Let's centralize all our communication
@@ -144,7 +179,7 @@ class SocketMan extends EventTarget {
       console.warn(`Unknown action [action=${JSON.stringify(action)}]`);
     }
 
-    const payload = await executioner(action.payload);
+    const payload = await executioner(action.payload, this);
     return port.postMessage({
       actionId: action.id,
       payload,
@@ -171,10 +206,25 @@ class SocketMan extends EventTarget {
   }
 }
 
-const init = () => {
+interface OpenTab extends browser.tabs.Tab {
+  savedTabId?: string;
+}
+
+interface State {
+  openTabs: { [id: string]: OpenTab };
+  savedTabs: { [id: string]: SFTab };
+}
+
+const state: State = {
+  openTabs: {},
+  savedTabs: {},
+};
+(window as any).state = state;
+const init = async () => {
   const port = ((window as any).port =
     browser.runtime.connectNative('spookfox'));
   const socket = new SocketMan(port);
+  (window as any).socket = socket;
 
   port.onDisconnect.addListener((p) => {
     console.log('Disconnected from Native APP');
@@ -182,8 +232,6 @@ const init = () => {
       console.error('Disconnected due to error', p.error);
     }
   });
-
-  browser.runtime.onConnect.addListener((p) => {});
 
   port.onMessage.addListener(async (pkt: Packet) => {
     if (pkt.status === 'Error') {
@@ -210,13 +258,26 @@ const init = () => {
   });
 
   browser.pageAction.onClicked.addListener(async (tab) => {
-    const res = await socket.sendAction('CHAIN_TAB', fromBrowserTab(tab));
-    console.warn('RESPONSE', res);
+    const tabWithId = state.openTabs[tab.id] || tab;
+    const savedTab = (await socket.sendAction(
+      'TOGGLE_TAB_CHAINING',
+      fromBrowserTab(tabWithId)
+    )) as SFTab;
+    // Very error-prone state management. Need to figure out a better way.
+    state.savedTabs[savedTab.id] = savedTab;
+    console.warn('CHAINED_TAB', savedTab);
 
-    return browser.pageAction.setIcon({
-      tabId: tab.id,
-      path: 'icons/chained-light.svg',
-    });
+    if (savedTab.chained) {
+      browser.pageAction.setIcon({
+        tabId: tab.id,
+        path: 'icons/chained-light.svg',
+      });
+    } else {
+      browser.pageAction.setIcon({
+        tabId: tab.id,
+        path: 'icons/unchained-light.svg',
+      });
+    }
   });
 
   browser.browserAction.onClicked.addListener(async () => {
