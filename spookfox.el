@@ -13,6 +13,7 @@
 ;;; Code:
 (require 'cl-lib)
 (require 'json)
+(require 'org)
 (require 'org-capture)
 (require 'org-id)
 
@@ -154,27 +155,26 @@ reaching exit condition in recursive re-checks."
 (defun sf--request-active-tab ()
   "Get details of active tab in browser."
   (sf--send-action "GET_ACTIVE_TAB")
-  (sf--poll-last-msg-payload))
+  (plist-get (sf--poll-last-msg-payload) :payload))
 
 (defun sf--request-all-tabs ()
   "Get all tabs currently present in browser."
   (sf--send-action "GET_ALL_TABS")
-  (sf--poll-last-msg-payload))
+  (plist-get (sf--poll-last-msg-payload) :payload))
 
-(defun sf--serialize-tab (tab)
-  "Convert browser TAB to org-mode-subtree string."
-  (concat "* "
-          (plist-get tab :title)
-          "\n:PROPERTIES:\n"
-          (seq-reduce (lambda (accum prop)
-                        (when (and (keywordp prop) (not (seq-contains-p '(:title :tags) prop)))
-                          (setq accum (concat (or accum "") (format "%s:\t" prop) (format "%s\n" (plist-get tab prop)))))
-                        accum)
-                      tab "")
-          ":END:\n"))
+(defun sf--insert-tab (tab)
+  "Insert browser TAB as a new org-mode-subtree."
+  (org-insert-heading)
+  (while tab
+    (let ((prop (upcase (substring (format "%s" (pop tab)) 1)))
+          (val (pop tab)))
+      (cond
+       ((string= "TITLE" prop) (org-edit-headline val))
+       ((string= "TAGS" prop) (org-set-tags val))
+       (t (org-entry-put (point) prop (format "%s" val)))))))
 
 (defun sf--deserialize-tab ()
-  "Return browser tab for subtree at point.
+  "Return spookfox tab for subtree at point.
 This function is useful for `org-map-entries`."
   (let ((props (org-entry-properties)))
     `(:title ,(alist-get "ITEM" props nil nil #'string=)
@@ -185,31 +185,29 @@ This function is useful for `org-map-entries`."
                              accum)
                            props nil))))
 
-(defun sf--textify-plist (pl title-prop)
-  "Convert PL plist to text obtained by TITLE-PROP property.
-
-All the plist's properties are put on the resultant text as
-text-properties."
-  (let ((text (plist-get pl title-prop)))
-    (cl-dolist (p pl)
-      (when (and (keywordp p) (not (eq title-prop p)))
-        (put-text-property 0 1 p (plist-get pl p) text)))
-    text))
-
 (defun sf--save-tabs (tabs &optional hide-prompt?)
   "Save spookfox TABS as an `org-mode` subtree.
 Tabs subtree is saved in `spokfox-saved-tabs-target`. Capture
 buffer is not shown if HIDE-PROMPT? is non-nil."
-  (let* ((tabs-subtree (seq-mapcat #'sf--serialize-tab tabs 'string))
-         (org-capture-templates
+  (let* ((org-capture-templates
           `(("t"
              "Spookfox tabs"
              entry
              ,spookfox-saved-tabs-target
-             ,tabs-subtree
+             "* %?"
              :unnarrowed t
              :immidiate-finish ,(not hide-prompt?)))))
-    (org-capture nil "t")))
+    (org-capture nil "t")
+    ;; Delete the "* " inserted by capture template; org-capture need us to
+    ;; start with a valid org-entry, but `sf--insert-tab' adds its own entries
+    ;; later.
+    (delete-char -3)
+    (let ((start-pos (point)))
+      (seq-map (lambda (tab)
+                 (sf--insert-tab tab)
+                 (goto-char (point-max))) tabs)
+      (goto-char start-pos))
+    (recenter-top-bottom)))
 
 (defmacro sf--with-tabs-subtree (&rest body)
   "Run BODY with current buffer set and narrowed to tabs org subtree.
