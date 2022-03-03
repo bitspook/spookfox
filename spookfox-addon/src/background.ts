@@ -21,14 +21,14 @@ type ActionPayload =
   | SearchActionPayload
   | OpenTabsActionPayload;
 
-type Message = Action | ActionResponse;
+type Message = Request | Response;
 
-interface ActionResponse {
+interface Response {
   actionId: string;
   payload: any;
 }
 
-interface Action {
+interface Request {
   id: string;
   action: string;
   payload: ActionPayload;
@@ -113,9 +113,9 @@ const actionsRepo: {
 };
 
 class ResponseHandler extends EventTarget {
-  responses: { [actionId: string]: ActionResponse } = {};
+  responses: { [actionId: string]: Response } = {};
 
-  addNew(res: ActionResponse) {
+  addNew(res: Response) {
     this.responses[res.actionId] = res;
     this.dispatchEvent(new Event(res.actionId));
   }
@@ -145,7 +145,7 @@ const init = () => {
   const responseHandler = new ResponseHandler();
 
   const sendAction = (name: string, payload?: ActionPayload) => {
-    const action: Action = {
+    const action: Request = {
       id: uuid(),
       action: name,
       payload,
@@ -156,7 +156,7 @@ const init = () => {
     return action.id;
   };
 
-  const handleAction = async (action: Action) => {
+  const handleAction = async (action: Request) => {
     const executioner = actionsRepo[action.action];
 
     if (!executioner) {
@@ -191,11 +191,11 @@ const init = () => {
     try {
       const msg: Message = JSON.parse(pkt.message);
 
-      if ((msg as Action).action) {
-        return handleAction(msg as Action);
+      if ((msg as Request).action) {
+        return handleAction(msg as Request);
       }
 
-      return responseHandler.addNew(msg as ActionResponse);
+      return responseHandler.addNew(msg as Response);
     } catch (err) {
       console.error(`Bad message payload [err=${err}, msg=${pkt.message}]`);
     }
