@@ -165,6 +165,7 @@ reaching exit condition in recursive re-checks."
 (defun sf--insert-tab (tab)
   "Insert browser TAB as a new org-mode-subtree."
   (org-insert-heading)
+  (org-id-get-create)
   (while tab
     (let ((prop (upcase (substring (format "%s" (pop tab)) 1)))
           (val (pop tab)))
@@ -302,7 +303,10 @@ PATCH is a plist of properties to upsert."
 
 (defun sf--handle-get-saved-tabs (_action)
   "Executioner for GET_SAVED_TABS ACTION."
-  (concat "[" (string-join (mapcar #'json-encode (sf--get-saved-tabs)) ",") "]"))
+  ;; Need to do the JSON encode/decode/encode dance again. I think we need a
+  ;; different data structure to represent a Tab; plist is proving problematic
+  ;; when we have to deal with list of Tabs
+  (json-parse-string (concat "[" (string-join (mapcar #'json-encode (sf--get-saved-tabs)) ",") "]")))
 
 (sf--add-action "CHAIN_TAB" #'sf--handle-chain-tab)
 (sf--add-action "GET_SAVED_TABS" #'sf--handle-get-saved-tabs)
