@@ -3,3 +3,4 @@
 node_modules
 .parcel-cache
 spookfox-addon/dist/
+/spookfox-addon/yarn-error.log

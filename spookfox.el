@@ -20,8 +20,8 @@
 (defvar sf--connection nil
   "Connection to spookfox socket.")
 
-(defvar sf--last-action-output nil
-  "Output produced by last spookfox action.")
+(defvar sf--last-response nil
+  "Most recently received response from browser.")
 
 (defvar spookfox-saved-tabs-target '(file+headline (expand-file-name "spookfox.org" org-directory) "Tabs")
   "Target parse-able by org-capture-template where browser tabs will be saved.")
@@ -32,23 +32,31 @@
 (defvar sf--tab-group-history nil
   "History of accessing spookfox tab groups.")
 
-(defvar sf--actions-alist nil
-  "A mapping of spookfox actions to functions.
-Alist representing functions to call when an action from spookfox
-browser is received.")
+(defvar sf--req-handlers-alist nil
+  "A mapping of spookfox requests and their handlers.")
 
 (defvar sf--known-tab-props '("id" "url" "chained" "id")
   "List of properties which are read when an org node is converted to a tab.")
 
 (defvar sf--reconnect-timer nil)
 
+(defvar spookfox-max-reconnect-retry-interval 30
+  "Maximum number of seconds to wait if connection to browser fails.
+We incrementally increase the time between reconnection attempts,
+and max out at this value.")
+
+;;; spookfox-core
+;;; Core functionality of spookfox, regarding
+;;; - Connecting to the browser
+;;; - Communication with the browser
 (defun sf--process-output-filter (_process pkt-str)
   "Choose what to do with PKT-STR sent by spookfox-native.
-It try to convert the packet to JSON, and pass it to action
-executioner if it is an action. Otherwise, for now it keep track
-of the last message only. If the communication b/w browser and
-Emacs gets noisier, we'll do something with the action-ids to
-keep track of actions and their responses."
+It try to convert the packet to JSON, and pass it to
+request-handler if it is a request. Otherwise, it is a response.
+For now it keep track of only the last response . If the
+communication b/w browser and Emacs gets noisier, we'll do
+something with the request-ids to keep track of requests and their
+responses."
   (with-current-buffer "*spookfox*" (insert pkt-str))
   (let ((msg (mapcar
               (lambda (x)
@@ -59,22 +67,22 @@ keep track of actions and their responses."
                  ((eq x :true) t)
                  (t x)))
               (plist-get (json-parse-string pkt-str :object-type 'plist) :message))))
-    (if (plist-get msg :action)
-        (sf--exec-action msg)
-      (setq sf--last-action-output msg))))
+    (if (plist-get msg :name)
+        (sf--handle-request msg)
+      (setq sf--last-response msg))))
 
 (defun sf--process-sentinel (_process event)
   "Start a timer when break-connection EVENT is received."
   (message (format "Spookfox process had the event: %s" event))
   (spookfox-ensure-connection))
 
-(defun sf--is-disconnected ()
+(defun sf--connected-p ()
   "Return t if connection to spookfox-native is not established."
-  (or (not sf--connection) (eq (process-status sf--connection) 'closed)))
+  (and sf--connection (not (eq (process-status sf--connection) 'closed))))
 
 (defun sf--connect ()
   "Connect or re-connect to spookfox browser addon."
-  (when (sf--is-disconnected)
+  (when (not (sf--connected-p))
     (setq sf--connection (make-network-process
                           :name "spookfox"
                           :buffer "*spookfox*"
@@ -87,7 +95,7 @@ keep track of actions and their responses."
       (setq sf--reconnect-timer nil))
     ;; Let's send a connected event to browser so it can refresh its state when
     ;; Emacs re-connects for whatever reason.
-    (sf--send-action "CONNECTED")
+    (spookfox-request "CONNECTED")
     (message "Connected to spookfox!")))
 
 (defun spookfox-ensure-connection (&optional retry-count)
@@ -104,7 +112,7 @@ is set accordingly."
 
   (let* ((retry-count (or retry-count 0))
          (retry-after (min (* retry-count 2) 15)))
-    (when (sf--is-disconnected)
+    (when (not (sf--connected-p))
       (when (> retry-after 2) (message "Will retry spookfox connection after %ss" retry-after)) ;so we don't spam for momentary reconnects
       (setq sf--reconnect-timer (run-with-timer retry-after nil 'spookfox-ensure-connection (1+ retry-count))) )))
 
@@ -122,20 +130,19 @@ connection to spookfox-native is not established."
   (sf--connect)                         ;It's safe to call `sf--connect' since it is idempotent.
                                         ;This gives us a safety net in case the
                                         ;timer for re-connection is waiting
-  (when (or
-         (not sf--connection)
-         (string= (process-status sf--connection) "closed"))
+  (when (not (sf--connected-p))
     (error "Not connected to spookfox-native"))
   (process-send-string sf--connection (sf--build-packet msg)))
 
-(defun sf--send-action (action &optional payload)
-  "Utility to send ACTION type messages, and optionally a PAYLOAD.
-Returns the action-id."
-  (let ((action-id (org-id-uuid)))
-    (sf--send-message `((action . ,action)
-                        (id . ,(org-id-uuid))
+(defun spookfox-request (name &optional payload)
+  "Make a request with NAME and optionally a PAYLOAD to browser.
+Returns the request-id so the caller can retrieve a response
+corresponding to this request."
+  (let ((id (org-id-uuid)))
+    (sf--send-message `((name . ,name)
+                        (id . ,id)
                         (payload . ,payload)))
-    action-id))
+    id))
 
 (defun sf--poll-last-msg-payload (&optional retry-count)
   "Synchronously provide latest message received from browser.
@@ -145,24 +152,27 @@ Emacs for maximum 1 second. If it don't receive a response in
 that time, it returns `nil`. RETRY-COUNT is for internal use, for
 reaching exit condition in recursive re-checks."
   (cl-block sf--poll-last-msg-payload
-    (let ((msg sf--last-action-output)
+    (let ((msg sf--last-response)
           (retry-count (or retry-count 0)))
       (when (> retry-count 5)
         (cl-return-from sf--poll-last-msg-payload))
       (when (not msg)
         (sleep-for 0 200)
         (cl-return-from sf--poll-last-msg-payload (sf--poll-last-msg-payload (1+ retry-count))))
-      (setq sf--last-action-output nil)
+      (setq sf--last-response nil)
       msg)))
+;;; spookfox-core ends here
 
+;;; spookfox-tabs
+;;; Access, save and manipulate browser tabs
 (defun sf--request-active-tab ()
   "Get details of active tab in browser."
-  (sf--send-action "GET_ACTIVE_TAB")
+  (spookfox-request "GET_ACTIVE_TAB")
   (plist-get (sf--poll-last-msg-payload) :payload))
 
 (defun sf--request-all-tabs ()
   "Get all tabs currently present in browser."
-  (sf--send-action "GET_ALL_TABS")
+  (spookfox-request "GET_ALL_TABS")
   (plist-get (sf--poll-last-msg-payload) :payload))
 
 (defun sf--insert-tab (tab)
@@ -290,25 +300,30 @@ PATCH is a plist of properties to upsert."
 (defun sf--tab-p (tab)
   "Return t if TAB is a spookfox tab, nil otherwise."
   (when (and (plist-get tab :id) (plist-get tab :url)) t))
+;;; spookfox-tabs ends here
 
-(defun sf--exec-action (action)
-  "Execute ACTION sent from spookfox browser."
-  (cl-dolist (executioner (cdr (assoc (plist-get action :action) sf--actions-alist #'string=)))
-    (let ((action-id (or (plist-get action :id) "<unknown>"))
-          (payload (funcall executioner action)))
-      (sf--send-message `(:actionId ,action-id :payload ,payload)))))
+;;; spookfox-request
+;;; Code for receiving and replying to requests from browser.
+(defun sf--handle-request (request)
+  "Handle REQUEST sent from browser."
+  (let* ((handler (cdr (assoc (plist-get request :name) sf--req-handlers-alist #'string=)))
+         (request-id (or (plist-get request :id) "<unknown>"))
+         (payload (funcall handler request)))
+    (sf--send-message `(:requestId ,request-id :payload ,payload))))
 
-(defun sf--add-action (action executioner)
-  "Run EXECUTIONER every time ACTION is received from browser."
-  (let ((cell (assoc action sf--actions-alist #'string=)))
-    (when (or (not cell) (not (seq-contains-p (cdr cell) executioner)))
-      (if (not cell)
-          (push (cons action (list executioner)) sf--actions-alist)
-        (push executioner (cdr cell))))))
+(defun sf--register-req-handler (request handler)
+  "Run HANDLER every time REQUEST is received from browser.
+Return value of HANDLER is sent back to browser as response."
+  (let ((cell (assoc request sf--req-handlers-alist #'string=)))
+    (when cell (error "Handler already registered. There can only by one handler per request"))
+    (push (cons request handler) sf--req-handlers-alist)))
+;;; spookfox-request ends here
 
-(defun sf--handle-toggle-tab-chaining (action)
-  "Executioner for TOGGLE_TAB_CHAINING ACTION."
-  (let* ((tab (plist-get action :payload))
+;;; spookfox-request-handlers
+;;; Code for handling particular requests.
+(defun sf--handle-toggle-tab-chaining (request)
+  "Handler for TOGGLE_TAB_CHAINING REQUEST."
+  (let* ((tab (plist-get request :payload))
          (chained? (not (plist-get tab :chained)))
          (tab-id (plist-get tab :id)))
     (if tab-id
@@ -318,17 +333,18 @@ PATCH is a plist of properties to upsert."
                     (sf--insert-tab (plist-put tab :chained chained?)))))
     (sf--find-tab-with-id tab-id)))
 
-(defun sf--handle-get-saved-tabs (_action)
-  "Executioner for GET_SAVED_TABS ACTION."
+(defun sf--handle-get-saved-tabs (_request)
+  "Handler for GET_SAVED_TABS REQUEST."
   ;; Need to do the JSON encode/decode/encode dance again. I think we need a
   ;; different data structure to represent a Tab; plist is proving problematic
   ;; when we have to deal with list of Tabs
   (json-parse-string (concat "[" (string-join (mapcar #'json-encode (sf--get-saved-tabs)) ",") "]")))
 
-(sf--add-action "TOGGLE_TAB_CHAINING" #'sf--handle-toggle-tab-chaining)
-(sf--add-action "GET_SAVED_TABS" #'sf--handle-get-saved-tabs)
+(sf--register-req-handler "TOGGLE_TAB_CHAINING" #'sf--handle-toggle-tab-chaining)
+(sf--register-req-handler "GET_SAVED_TABS" #'sf--handle-get-saved-tabs)
+;;; spookfox-request-handlers ends here
 
-;; Public interface
+;;; spookfox-interactive-functions
 (defun spookfox-save-all-tabs ()
   "Save all currently open browser tabs at `spookfox-saved-tabs-target`.
 It will open a capture buffer so user get a chance to preview and
@@ -349,11 +365,11 @@ make changes."
   (let ((tab (sf--tab-read)))
     (cond
      ((sf--tab-p tab)
-      (sf--send-action "OPEN_TAB" tab))
+      (spookfox-request "OPEN_TAB" tab))
      ((string-match "https?:\/\/.*[\.].*" tab)
-      (sf--send-action "OPEN_TAB" `(:url ,tab)))
+      (spookfox-request "OPEN_TAB" `(:url ,tab)))
      (t
-      (sf--send-action "SEARCH_FOR" tab)))))
+      (spookfox-request "SEARCH_FOR" tab)))))
 
 (defun spookfox-open-tab-group ()
   "Prompt user to select a tab group, and open all tabs in it."
@@ -362,14 +378,15 @@ make changes."
          (groups (seq-uniq (seq-mapcat (lambda (tab) (plist-get tab :tags)) tabs)))
          (selected-group (completing-read "Select tab group: " groups nil t nil sf--tab-group-history))
          (group-tabs (seq-filter (lambda (tab) (seq-contains-p (plist-get tab :tags) selected-group #'string=)) tabs)))
-    (sf--send-action
+    (spookfox-request
      "OPEN_TABS"
      (json-parse-string                 ; json-encode kinda messes up converting list
                                         ; of plists; so we make proper
                                         ; json-string, parses it to hashmap so
-                                        ; sf--send-action can parse it again
+                                        ; spookfox-request can parse it again
                                         ; into a proper JSON array
       (concat "[" (string-join (mapcar #'json-encode group-tabs) ",") "]")))))
+;;; spookfox-interactive-functions ends here
 
 (spookfox-ensure-connection)
 

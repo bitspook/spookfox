@@ -2,14 +2,14 @@ import { v4 as uuid } from 'uuid';
 import { OpenTab, SFTab } from '../tabs';
 import setupBroker from './broker';
 
-interface ActionResponse {
-  actionId: string;
+interface Response {
+  requestId: string;
   payload: any;
 }
 
-interface Action {
+interface Request {
   id: string;
-  action: string;
+  name: string;
   payload: any;
 }
 
@@ -40,8 +40,7 @@ export enum SFEvents {
   // that if it don't disconnects, it connects. Sounds like ancient wisdom.
   EMACS_CONNECTED = 'EMACS_CONNECTED',
   DISCONNECTED = 'DISCONNECTED',
-  // A request (aka Action) Emacs sent to do something or to provide
-  // some information
+  // A request Emacs sent to do something or to provide some information
   REQUEST = 'REQUEST',
   // Response Emacs sent for a request we made
   RESPONSE = 'RESPONSE',
@@ -71,7 +70,7 @@ export class SFEvent<P = any> extends Event {
  * 2. Run a function when Emacs makes a request
  * ```
  * const sf = new Spookfox();
- * sf.registerAction('OPEN_TAB', ({ url }) => {
+ * sf.registerHandler('OPEN_TAB', ({ url }) => {
  *   // somehow open a new tab with `url` provided by Emacs.
  * })
  * ```
@@ -87,7 +86,7 @@ export class SFEvent<P = any> extends Event {
  *
  * # Events
  * It emits `SFEvents`. `SFEvents.REQUEST` and `SFEvents.RESPONSE` don't
- * need to be handled manually. `Spookfox.request` and `Spookfox.registerAction`
+ * need to be handled manually. `Spookfox.request` and `Spookfox.registerHandler`
  * should be sufficient for most cases.
  */
 // It extends `EventTarget` so we can have the ability to emit and listen to
@@ -99,7 +98,7 @@ export class Spookfox extends EventTarget {
     openTabs: {},
     savedTabs: {},
   };
-  executioners = {};
+  reqHandlers = {};
 
   constructor(port?: browser.runtime.Port) {
     super();
@@ -115,15 +114,15 @@ export class Spookfox extends EventTarget {
    * Returns a promise of response returned by Emacs.
    */
   request(name: string, payload?: object) {
-    const action = {
+    const request = {
       id: uuid(),
-      action: name,
+      name,
       payload,
     };
 
-    this.port.postMessage(action);
+    this.port.postMessage(request);
 
-    return this.getResponse(action.id);
+    return this.getResponse(request.id);
   }
 
   /**
@@ -133,17 +132,17 @@ export class Spookfox extends EventTarget {
     this.dispatchEvent(new SFEvent(name, payload));
   }
 
-  registerAction(
+  registerHandler(
     name: string,
-    executioner: (payload: any, sf: Spookfox) => object
+    handler: (payload: any, sf: Spookfox) => object
   ) {
-    if (this.executioners[name]) {
+    if (this.reqHandlers[name]) {
       throw new Error(
-        `Action already registered. There can only by one executioner per action. [action=${name}]`
+        `Handler already registered. There can only by one handler per request. [request=${name}]`
       );
     }
 
-    this.executioners[name] = executioner;
+    this.reqHandlers[name] = handler;
   }
 
   newState(s: State) {
@@ -156,20 +155,20 @@ export class Spookfox extends EventTarget {
    * Calling this is critical for processing any requests received from Emacs.
    */
   private setupRequestHandler = async () => {
-    this.addEventListener(SFEvents.REQUEST, async (e: SFEvent<Action>) => {
-      const action = e.payload;
-      const executioner = this.executioners[action.action];
+    this.addEventListener(SFEvents.REQUEST, async (e: SFEvent<Request>) => {
+      const request = e.payload;
+      const executioner = this.reqHandlers[request.name];
 
       if (!executioner) {
         console.warn(
-          `No executioner for action [action=${JSON.stringify(action)}]`
+          `No handler for request [request=${JSON.stringify(request)}]`
         );
         return;
       }
-      const response = await executioner(action.payload, this);
+      const response = await executioner(request.payload, this);
 
       return this.port.postMessage({
-        actionId: action.id,
+        requestId: request.id,
         payload: response,
       });
     });
@@ -181,32 +180,32 @@ export class Spookfox extends EventTarget {
    * Emacs.
    */
   private setupResponseHandler() {
-    this.addEventListener(SFEvents.RESPONSE, (e: SFEvent<ActionResponse>) => {
+    this.addEventListener(SFEvents.RESPONSE, (e: SFEvent<Response>) => {
       const res = e.payload;
 
-      if (!res.actionId) {
+      if (!res.requestId) {
         throw new Error(`Invalid response: [res=${res}]`);
       }
 
-      // Dispatch a unique event per actionId. Shenanigans I opted for doing
+      // Dispatch a unique event per `requestId`. Shenanigans I opted for doing
       // to build a promise based interface on request/response dance needed
       // for communication with Emacs. Check `Spookfox.getResponse`
-      this.dispatch(res.actionId, res.payload);
+      this.dispatch(res.requestId, res.payload);
     });
   }
 
-  private getResponse(actionId: string) {
+  private getResponse(requestId: string) {
     // FIXME: It is possible that this promise will never resolve, if for some
     // reason Emacs failed to respond. We should probably add a timeout here to
     // reject the promise if we don't get a response in X time
     return new Promise((resolve) => {
       const listener = (event: SFEvent) => {
-        this.removeEventListener(actionId, listener);
+        this.removeEventListener(requestId, listener);
 
         resolve(event.payload);
       };
 
-      this.addEventListener(actionId, listener);
+      this.addEventListener(requestId, listener);
     });
   }
 }

@@ -2,7 +2,6 @@ import { v4 as uuid } from 'uuid';
 import { Spookfox, SFEvent, SFEvents } from './Spookfox';
 import {
   SFTab,
-  OpenTab,
   fromBrowserTab,
   getActiveTab,
   getAllTabs,
@@ -92,11 +91,11 @@ const run = async () => {
 
   sf.addEventListener(SFEvents.EMACS_CONNECTED, handleReconnect);
 
-  sf.registerAction('GET_ACTIVE_TAB', getActiveTab);
-  sf.registerAction('GET_ALL_TABS', getAllTabs);
-  sf.registerAction('OPEN_TAB', openTab);
-  sf.registerAction('OPEN_TABS', openTabs);
-  sf.registerAction('SEARCH_FOR', searchFor);
+  sf.registerHandler('GET_ACTIVE_TAB', getActiveTab);
+  sf.registerHandler('GET_ALL_TABS', getAllTabs);
+  sf.registerHandler('OPEN_TAB', openTab);
+  sf.registerHandler('OPEN_TABS', openTabs);
+  sf.registerHandler('SEARCH_FOR', searchFor);
 };
 
 run();

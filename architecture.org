@@ -54,10 +54,9 @@ Spookfox has 3 primary components:
   purely a transfer thing, and shouldn't contain any business knowledge. It only
   has information about what is being transferred, if the transfer was
   successful, and who is doing the transfer.
-- <<Action>> :: Analogous of a request in most protocols. This is a message one
+- <<Request>> :: Analogous of a request in most protocols. This is a message one
   side sends to another, expecting it to do some operation and/or a response.
-  Every action has a unique ID.
-- <<Action-response>> :: Result of performing an action. Since action is
-  originates on one end (e.g [[se]]) and executed at another end (e.g [[sa]]), every
-  action-response contains an =actionId= identifying which action is being
-  responded to.
+  Every request must have a unique ID.
+- <<Response>> :: Response to a request. Since [[request]] originates on one end
+  (e.g [[se]]) and handled at another end (e.g [[sa]]), every response contains an
+  =requestId= identifying which requests is being responded to.

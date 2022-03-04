@@ -36,14 +36,11 @@ export default (sf: Spookfox) => {
       const msg = JSON.parse(pkt.message);
       // Handle this event as a special case to provide a uniform interface through
       // `Spookfox`.
-      if (msg.action === 'CONNECTED') {
+      if (msg.name === 'CONNECTED') {
         return sf.dispatch(SFEvents.EMACS_CONNECTED);
       }
 
-      // Not sure if this check is as flimsy as it feels. Perhaps we should have
-      // a better structure; like { type: 'request', name: 'MY_ACTION' }? To be decided
-      // in [#9](https://github.com/bitspook/spookfox/issues/9)
-      if (msg.action) {
+      if (msg.name) {
         return sf.dispatch(SFEvents.REQUEST, msg);
       }
 
