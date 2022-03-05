@@ -45,6 +45,9 @@
 We incrementally increase the time between reconnection attempts,
 and max out at this value.")
 
+(defvar sf--last-faulty-pkt nil
+  "Last Packet which caused a json encoding error. Useful for debugging.")
+
 ;;; spookfox-core
 ;;; Core functionality of spookfox, regarding
 ;;; - Connecting to the browser
@@ -57,11 +60,24 @@ For now it keep track of only the last response . If the
 communication b/w browser and Emacs gets noisier, we'll do
 something with the request-ids to keep track of requests and their
 responses."
-  (with-current-buffer "*spookfox*" (insert pkt-str))
-  (let ((msg (plist-get (json-parse-string pkt-str :object-type 'plist) :message)))
-    (if (plist-get msg :name)
-        (sf--handle-request msg)
-      (setq sf--last-response msg))))
+  (with-current-buffer "*spookfox*"
+    (goto-char (point-max))
+    (insert pkt-str))
+  ;; Sometimes pkt-str contain more than one packets. I suppose that's just how
+  ;; UNIX sockets work (they combine messages when there is congestion)? So we
+  ;; have to manually split them at newlines
+  (let ((pkt-strs (seq-filter (lambda (x) (not (string-empty-p x))) (split-string pkt-str "\n"))))
+    (cl-dolist (pkt-str pkt-strs)
+      (let* ((pkt (condition-case nil
+                      (json-parse-string pkt-str :object-type 'plist)
+                    (error (setq sf--last-faulty-pkt pkt-str)
+                           (message "Spookfox failed to parse a packet. Check `sf--last-faulty-pkt`")
+                           nil)))
+             (msg (plist-get pkt :message)))
+        (when msg
+          (if (plist-get msg :name)
+              (sf--handle-request msg)
+            (setq sf--last-response msg)))))))
 
 (defun sf--process-sentinel (_process event)
   "Start a timer when break-connection EVENT is received."
@@ -263,12 +279,21 @@ PATCH is a plist of properties to upsert."
        (while patch
          (let ((prop (upcase (substring (symbol-name (pop patch)) 1)))
                (val (pop patch)))
-           (cond
-            ((string= "TAGS" prop)
-             (org-set-tags val))
-            ((string= "TITLE" prop)
-             (org-edit-headline val))
-            (t (org-entry-put (point) prop val)))))
+           (pcase prop
+             ("TAGS" (org-set-tags val))
+             ("TITLE" (org-edit-headline val))
+             (_ (org-entry-put (point) prop val)))))
+       (save-buffer)))))
+
+(defun sf--remove-tab (tab-id)
+  "Remove tab with TAB-ID."
+  (sf--with-tabs-subtree
+   (let ((pos (org-id-find-id-in-file tab-id (buffer-file-name))))
+     (when pos
+       (goto-char (cdr pos))
+       (org-narrow-to-subtree)
+       (delete-region (point-min) (point-max))
+       (widen)
        (save-buffer)))))
 
 (defun sf--tab-read ()
@@ -347,8 +372,25 @@ Return value of HANDLER is sent back to browser as response."
   ;; when we have to deal with list of Tabs
   (json-parse-string (concat "[" (string-join (mapcar #'json-encode (sf--get-saved-tabs)) ",") "]")))
 
+(defun sf--handle-remove-tab (tab)
+  "Handler for REMOVE_TAB action."
+  (sf--remove-tab (plist-get tab :id)))
+
+(defun sf--handle-update-tab (tab)
+  "Handler for UPDATE_TAB action."
+  (sf--update-tab
+   (plist-get tab :id)
+   (mapcar
+    (lambda (x)
+      (cond
+       ((eq x nil) "nil")
+       ((eq x t) "t")
+       (t x))) tab)))
+
 (sf--register-req-handler "TOGGLE_TAB_CHAINING" #'sf--handle-toggle-tab-chaining)
 (sf--register-req-handler "GET_SAVED_TABS" #'sf--handle-get-saved-tabs)
+(sf--register-req-handler "REMOVE_TAB" #'sf--handle-remove-tab)
+(sf--register-req-handler "UPDATE_TAB" #'sf--handle-update-tab)
 ;;; spookfox-request-handlers ends here
 
 ;;; spookfox-interactive-functions
