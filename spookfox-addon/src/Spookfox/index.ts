@@ -60,33 +60,19 @@ export class SFEvent<P = any> extends Event {
 /**
  * `Spookfox` is the heart of this addon.
  * # Usage
- * It should be used to
- * 1. Make a request to Emacs
+ * 1. Keep a single Spookfox instance. Spookfox will create its own `browser.runtime.port.Port`
  * ```
  * const sf = new Spookfox();
- * const savedTabs = sf.request('GET_SAVED_TABS');
  * ```
- *
- * 2. Run a function when Emacs makes a request
+ * 2. Create a `browser.runtime.port.Port` if you want multiple Spookfox instances around.
+ * e.g for multiple windows?
  * ```
- * const sf = new Spookfox();
- * sf.registerHandler('OPEN_TAB', ({ url }) => {
- *   // somehow open a new tab with `url` provided by Emacs.
- * })
+ * const port = browser.runtime.connectNative('spookfox');
+ * const sf = new Spookfox(port);
  * ```
- *
- * 3. Change the state
- * ```
- * const sf = new Spookfox();
- * const newState = { ... };
- * sf.newState(newState);
- * ```
- * Spookfox.state should be treated as immutable and shouldn't be modified in-place.
- * Instead, use `Spookfox.newState(s: State)` to replace existing state as a whole.
- *
  * # Events
  * It emits `SFEvents`. `SFEvents.REQUEST` and `SFEvents.RESPONSE` don't
- * need to be handled manually. `Spookfox.request` and `Spookfox.registerHandler`
+ * need to be handled manually. `Spookfox.request` and `Spookfox.registerReqHandler`
  * should be sufficient for most cases.
  */
 // It extends `EventTarget` so we can have the ability to emit and listen to
@@ -110,8 +96,12 @@ export class Spookfox extends EventTarget {
   }
 
   /**
-   * A convenience function for sending a request with NAME and PAYLOAD to Emacs.
+   * Send a request with NAME and PAYLOAD to Emacs.
    * Returns a promise of response returned by Emacs.
+   * # Example
+   * ```
+   * const savedTabs = sf.request('GET_SAVED_TABS');
+   * ```
    */
   request(name: string, payload?: object) {
     const request = {
@@ -131,8 +121,16 @@ export class Spookfox extends EventTarget {
   dispatch(name: string, payload?: object) {
     this.dispatchEvent(new SFEvent(name, payload));
   }
-
-  registerHandler(
+  /**
+   * Run a function when Emacs makes a request.
+   * # Example
+   * ```
+   * sf.registerReqHandler('OPEN_TAB', ({ url }) => {
+   *   // somehow open a new tab with `url` provided by Emacs.
+   * })
+   * ```
+   */
+  registerReqHandler(
     name: string,
     handler: (payload: any, sf: Spookfox) => object
   ) {
@@ -145,6 +143,17 @@ export class Spookfox extends EventTarget {
     this.reqHandlers[name] = handler;
   }
 
+  /**
+   * Change Spookfox state. Calling this will set the state to new given state,
+   * and emit `SFEvents.NEW_STATE` event.
+   * Spookfox.state should be treated as immutable and shouldn't be modified in-place.
+   * Instead, use `Spookfox.newState(s: State)` to replace existing state as a whole.
+   * # Example
+   * ```
+   * const newState = { ... };
+   * sf.newState(newState);
+   * ```
+   */
   newState(s: State) {
     this.state = s;
     this.dispatch(SFEvents.NEW_STATE, s);

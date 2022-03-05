@@ -91,11 +91,11 @@ const run = async () => {
 
   sf.addEventListener(SFEvents.EMACS_CONNECTED, handleReconnect);
 
-  sf.registerHandler('GET_ACTIVE_TAB', getActiveTab);
-  sf.registerHandler('GET_ALL_TABS', getAllTabs);
-  sf.registerHandler('OPEN_TAB', openTab);
-  sf.registerHandler('OPEN_TABS', openTabs);
-  sf.registerHandler('SEARCH_FOR', searchFor);
+  sf.registerReqHandler('GET_ACTIVE_TAB', getActiveTab);
+  sf.registerReqHandler('GET_ALL_TABS', getAllTabs);
+  sf.registerReqHandler('OPEN_TAB', openTab);
+  sf.registerReqHandler('OPEN_TABS', openTabs);
+  sf.registerReqHandler('SEARCH_FOR', searchFor);
 };
 
 run();
