@@ -16,7 +16,7 @@ interface Request {
 /**
  * Mutable data we need to keep track of. Lesser the better.
  */
-interface State {
+export interface State {
   // All the tabs open in browser at any time. Assumption is that this list is
   // created when Emacs first connects, and then kept up-to-date by browser
   // itself whenever anything related to a tab changes
@@ -93,6 +93,7 @@ export class Spookfox extends EventTarget {
     setupBroker(this);
     this.setupRequestHandler();
     this.setupResponseHandler();
+    this.initStateOnReconnect();
   }
 
   /**
@@ -215,6 +216,51 @@ export class Spookfox extends EventTarget {
       };
 
       this.addEventListener(requestId, listener);
+    });
+  }
+
+  /**
+   * Initialize `Spookfox.state` When Emacs first connects.
+   */
+  private initStateOnReconnect() {
+    this.addEventListener(SFEvents.EMACS_CONNECTED, async () => {
+      const savedTabs = (await this.request('GET_SAVED_TABS')) as SFTab[];
+      const currentTabs = await browser.tabs.query({ windowId: 1 });
+
+      // Problem: There might be tabs with same URLs
+      // Solution: First open tab in browser is mapped to first tab saved in Emacs.
+      // Catch: Every time this function runs, all current tabs which match urls
+      // saved in Emacs are mapped; regardless of whether user meant it or not.
+      const takenSavedTabIds = [];
+      const openTabs = currentTabs.reduce((accum, tab) => {
+        const savedTab = savedTabs.find(
+          (st) => st.url === tab.url && takenSavedTabIds.indexOf(st.id) === -1
+        );
+        if (savedTab) {
+          takenSavedTabIds.push(savedTab.id);
+          accum[tab.id] = {
+            savedTabId: savedTab.id,
+            ...tab,
+          };
+        } else {
+          accum[tab.id] = tab;
+        }
+
+        return accum;
+      }, {});
+
+      const savedTabsMap = savedTabs.reduce((accum, tab) => {
+        accum[tab.id] = tab;
+        return accum;
+      }, {});
+
+      const newState = {
+        ...this.state,
+        openTabs,
+        savedTabs: savedTabsMap,
+      };
+
+      this.newState(newState);
     });
   }
 }

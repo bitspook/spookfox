@@ -1,5 +1,5 @@
 import { v4 as uuid } from 'uuid';
-import { Spookfox, SFEvent, SFEvents } from './Spookfox';
+import { Spookfox, SFEvent, SFEvents, State } from './Spookfox';
 import {
   SFTab,
   fromBrowserTab,
@@ -14,48 +14,6 @@ const searchFor = async (p: string) => {
   browser.search.search({ query: p });
 
   return {};
-};
-
-const handleReconnect = async (event: SFEvent) => {
-  const sf = event.target as Spookfox;
-
-  const savedTabs = (await sf.request('GET_SAVED_TABS')) as SFTab[];
-  const currentTabs = await browser.tabs.query({ windowId: 1 });
-
-  // Problem: There might be tabs with same URLs
-  // Solution: First open tab in browser is mapped to first tab saved in Emacs.
-  // Catch: Every time this function runs, all current tabs which match urls
-  // saved in Emacs are mapped; regardless of whether user meant it or not.
-  const takenSavedTabIds = [];
-  const openTabs = currentTabs.reduce((accum, tab) => {
-    const savedTab = savedTabs.find(
-      (st) => st.url === tab.url && takenSavedTabIds.indexOf(st.id) === -1
-    );
-    if (savedTab) {
-      takenSavedTabIds.push(savedTab.id);
-      accum[tab.id] = {
-        savedTabId: savedTab.id,
-        ...tab,
-      };
-    } else {
-      accum[tab.id] = tab;
-    }
-
-    return accum;
-  }, {});
-
-  const savedTabsMap = savedTabs.reduce((accum, tab) => {
-    accum[tab.id] = tab;
-    return accum;
-  }, {});
-
-  const newState = {
-    ...sf.state,
-    openTabs,
-    savedTabs: savedTabsMap,
-  };
-
-  sf.newState(newState);
 };
 
 const run = async () => {
@@ -94,8 +52,33 @@ const run = async () => {
     sf.newState(state);
   });
 
-  sf.addEventListener(SFEvents.NEW_STATE, (e: SFEvent) => {
+  // For debugging
+  sf.addEventListener(SFEvents.NEW_STATE, (e: SFEvent<State>) => {
     console.warn('NEW_STATE', e.payload);
+  });
+
+  // Ensure page-action icons (chained icon) for all tabs are always correct
+  sf.addEventListener(SFEvents.NEW_STATE, (e: SFEvent<State>) => {
+    const state = e.payload;
+    const tabs = Object.values(state.openTabs);
+    const iconColor = window.matchMedia('(prefers-color-scheme: dark)').matches
+      ? 'light'
+      : 'dark';
+
+    tabs.forEach((tab) => {
+      if (!tab) return;
+      const savedTab = state.savedTabs[tab.savedTabId];
+      let icon = `icons/unchained-${iconColor}.svg`;
+
+      if (savedTab && savedTab.chained) {
+        icon = `icons/chained-${iconColor}.svg`;
+      }
+
+      browser.pageAction.setIcon({
+        tabId: tab.id,
+        path: icon,
+      });
+    });
   });
 
   browser.pageAction.onClicked.addListener(async (t) => {
@@ -110,22 +93,11 @@ const run = async () => {
         ...tab,
       })
     )) as SFTab;
-    console.log('SAVED TAB', savedTab);
+
     state.openTabs[`${tab.id}`].savedTabId = savedTab.id;
     state.savedTabs[savedTab.id] = savedTab;
-    sf.newState(state);
 
-    if (savedTab.chained) {
-      browser.pageAction.setIcon({
-        tabId: t.id,
-        path: 'icons/chained-light.svg',
-      });
-    } else {
-      browser.pageAction.setIcon({
-        tabId: t.id,
-        path: 'icons/unchained-light.svg',
-      });
-    }
+    sf.newState(state);
   });
 
   browser.browserAction.onClicked.addListener(async () => {
@@ -133,8 +105,6 @@ const run = async () => {
 
     console.warn('SAVED TABS', savedTabs);
   });
-
-  sf.addEventListener(SFEvents.EMACS_CONNECTED, handleReconnect);
 
   sf.registerReqHandler('GET_ACTIVE_TAB', getActiveTab);
   sf.registerReqHandler('GET_ALL_TABS', getAllTabs);
