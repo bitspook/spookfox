@@ -58,15 +58,7 @@ communication b/w browser and Emacs gets noisier, we'll do
 something with the request-ids to keep track of requests and their
 responses."
   (with-current-buffer "*spookfox*" (insert pkt-str))
-  (let ((msg (mapcar
-              (lambda (x)
-                (cond
-                 ;; because parsing JSON string to plist convert JS true/false
-                 ;; to keywords
-                 ((eq x :false) nil)
-                 ((eq x :true) t)
-                 (t x)))
-              (plist-get (json-parse-string pkt-str :object-type 'plist) :message))))
+  (let ((msg (plist-get (json-parse-string pkt-str :object-type 'plist) :message)))
     (if (plist-get msg :name)
         (sf--handle-request msg)
       (setq sf--last-response msg))))
@@ -193,12 +185,17 @@ reaching exit condition in recursive re-checks."
 This function is useful for `org-map-entries`."
   (let ((props (org-entry-properties)))
     `(:title ,(alist-get "ITEM" props nil nil #'string=)
-             :tags ,(mapcar #'substring-no-properties (org-get-tags))
-             ,@(seq-reduce (lambda (accum cell)
-                             (when (seq-contains-p sf--known-tab-props (downcase (car cell)) #'string=) ;; org-mode upcase all the property names
-                               (setq accum (plist-put accum (intern (downcase (format ":%s" (car cell)))) (cdr cell))))
-                             accum)
-                           props nil))))
+      :tags ,(mapcar #'substring-no-properties (org-get-tags))
+      ,@(seq-reduce (lambda (accum cell)
+                      (when (seq-contains-p sf--known-tab-props (downcase (car cell)) #'string=) ;; org-mode upcase all the property names
+                        (setq accum (plist-put accum
+                                               (intern (downcase (format ":%s" (car cell))))
+                                               (pcase (cdr cell)
+                                                 ("t" t)
+                                                 ("nil" nil)
+                                                 (val val)))))
+                      accum)
+                    props nil))))
 
 (defun sf--save-tabs (tabs &optional hide-prompt?)
   "Save spookfox TABS as an `org-mode` subtree.
@@ -308,8 +305,19 @@ PATCH is a plist of properties to upsert."
   "Handle REQUEST sent from browser."
   (let* ((handler (cdr (assoc (plist-get request :name) sf--req-handlers-alist #'string=)))
          (request-id (or (plist-get request :id) "<unknown>"))
-         (payload (funcall handler request)))
-    (sf--send-message `(:requestId ,request-id :payload ,payload))))
+         (req-payload (mapcar
+              (lambda (x)
+                (pcase x
+                  ;; because parsing JSON string to plist convert JS true/false
+                  ;; to keywords :true/:false sometimes. Seems like a bug in Emacs's
+                  ;; JSON parsing
+                  (:false nil)
+                  (:true t)
+                  ("null" nil)
+                  (val val)))
+              (plist-get request :payload)))
+         (res-payload (funcall handler req-payload)))
+    (sf--send-message `(:requestId ,request-id :payload ,res-payload))))
 
 (defun sf--register-req-handler (request handler)
   "Run HANDLER every time REQUEST is received from browser.
@@ -321,20 +329,19 @@ Return value of HANDLER is sent back to browser as response."
 
 ;;; spookfox-request-handlers
 ;;; Code for handling particular requests.
-(defun sf--handle-toggle-tab-chaining (request)
+(defun sf--handle-toggle-tab-chaining (tab)
   "Handler for TOGGLE_TAB_CHAINING REQUEST."
-  (let* ((tab (plist-get request :payload))
-         (chained? (not (plist-get tab :chained)))
+  (let* ((chained? (not (plist-get tab :chained)))
          (tab-id (plist-get tab :id)))
     (if tab-id
-        (sf--update-tab tab-id '(:chained (format "%s" chained?)))
+        (sf--update-tab tab-id `(:chained ,(format "%s" chained?)))
       (setq tab-id (sf--with-tabs-subtree
                     (goto-char (point-max))
                     (sf--insert-tab (plist-put tab :chained chained?)))))
     (sf--find-tab-with-id tab-id)))
 
-(defun sf--handle-get-saved-tabs (_request)
-  "Handler for GET_SAVED_TABS REQUEST."
+(defun sf--handle-get-saved-tabs (_payload)
+  "Handler for GET_SAVED_TABS."
   ;; Need to do the JSON encode/decode/encode dance again. I think we need a
   ;; different data structure to represent a Tab; plist is proving problematic
   ;; when we have to deal with list of Tabs

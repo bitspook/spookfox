@@ -30,6 +30,7 @@ export const fromBrowserTab = (tab: OpenTab): SFTab => {
     id: tab.savedTabId,
     title: tab.title,
     url: tab.url,
+    chained: tab.chained || false,
   };
 };
 

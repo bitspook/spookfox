@@ -7,6 +7,7 @@ import {
   getAllTabs,
   openTab,
   openTabs,
+  OpenTab,
 } from './tabs';
 
 const searchFor = async (p: string) => {
@@ -60,24 +61,68 @@ const handleReconnect = async (event: SFEvent) => {
 const run = async () => {
   const sf = ((window as any).sf = new Spookfox());
 
-  browser.pageAction.onClicked.addListener(async (tab) => {
+  browser.tabs.onCreated.addListener((tab) => {
     const state = { ...sf.state };
-    const tabWithId = state.openTabs[tab.id] || tab;
+    state.openTabs[`${tab.id}`] = tab;
+
+    sf.newState(state);
+  });
+
+  browser.tabs.onUpdated.addListener((tabId, changeInfo) => {
+    // We aren't interested in all the tab changes (e.g which tab is active).
+    // Here is a list of properties which we care about
+    const desiredProps = ['url'];
+    const changedDesiredProps = Object.keys(changeInfo).filter((k) =>
+      desiredProps.includes(k)
+    );
+    if (!changedDesiredProps.length) {
+      return;
+    }
+
+    const state = { ...sf.state };
+    const tab = state.openTabs[`${tabId}`];
+    state.openTabs[`${tabId}`] = { ...tab, ...changeInfo };
+
+    sf.newState(state);
+  });
+
+  browser.tabs.onRemoved.addListener((tabId, { windowId }) => {
+    if (windowId !== 1) return;
+    const state = { ...sf.state };
+    state.openTabs[`${tabId}`] = null;
+
+    sf.newState(state);
+  });
+
+  sf.addEventListener(SFEvents.NEW_STATE, (e: SFEvent) => {
+    console.warn('NEW_STATE', e.payload);
+  });
+
+  browser.pageAction.onClicked.addListener(async (t) => {
+    const state = { ...sf.state };
+    const tab = state.openTabs[t.id];
+    const localSavedTab = state.savedTabs[tab.savedTabId] || {};
+
     const savedTab = (await sf.request(
       'TOGGLE_TAB_CHAINING',
-      fromBrowserTab(tabWithId)
+      fromBrowserTab({
+        ...localSavedTab,
+        ...tab,
+      })
     )) as SFTab;
+    console.log('SAVED TAB', savedTab);
+    state.openTabs[`${tab.id}`].savedTabId = savedTab.id;
     state.savedTabs[savedTab.id] = savedTab;
     sf.newState(state);
 
     if (savedTab.chained) {
       browser.pageAction.setIcon({
-        tabId: tab.id,
+        tabId: t.id,
         path: 'icons/chained-light.svg',
       });
     } else {
       browser.pageAction.setIcon({
-        tabId: tab.id,
+        tabId: t.id,
         path: 'icons/unchained-light.svg',
       });
     }
