@@ -369,7 +369,7 @@ Return value of HANDLER is sent back to browser as response."
   (let* ((chained? (not (plist-get tab :chained)))
          (tab-id (plist-get tab :id)))
     (if tab-id
-        (sf--update-tab tab-id `(:chained ,(format "%s" chained?)))
+        (sf--handle-update-tab (plist-put tab :chained chained?))
       (setq tab-id (sf--with-tabs-subtree
                     (goto-char (point-max))
                     (sf--insert-tab (plist-put tab :chained chained?)))))

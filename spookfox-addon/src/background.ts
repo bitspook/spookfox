@@ -103,12 +103,6 @@ const run = async () => {
     const tab = state.openTabs[t.id];
     const localSavedTab = state.savedTabs[tab.savedTabId] || {};
 
-    // I think we should get rid of 'TOGGLE_TAB_CHAINING' request from browser,
-    // and instead use 'UPDATE_TAB' for this. This works better for scenarios
-    // like: User opened a tab, it is chained at this point. User unchains the
-    // tab. User go to Y URL. User chains the tab again. Now even though tab
-    // chaining is set to `t` in Emacs, URL and title for this tab are still
-    // old.
     const savedTab = (await sf.request(
       'TOGGLE_TAB_CHAINING',
       fromBrowserTab({
