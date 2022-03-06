@@ -28,7 +28,10 @@ export interface OpenTab extends browser.tabs.Tab {
 export const fromBrowserTab = (tab: OpenTab): SFTab => {
   return {
     id: tab.savedTabId,
-    title: tab.title,
+    // I've found tridactyl to send a single ASCII 160 (non-breaking-space) in
+    // title; which Emacs string trimming functions don't consider a space. One
+    // flimsy way to handle it is to just not send an empty title 🤷🏻
+    title: tab.title.trim() ? tab.title : '<no-title>',
     url: tab.url,
     chained: tab.chained || false,
   };

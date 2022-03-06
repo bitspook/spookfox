@@ -48,6 +48,14 @@ and max out at this value.")
 (defvar sf--last-faulty-pkt nil
   "Last Packet which caused a json encoding error. Useful for debugging.")
 
+;;; spookfox-lib
+;;; Utility functions
+(defun sf--string-banlk-p (str)
+  "Return t if STR is blank.
+Considers hard-space (ASCII 160) as space."
+  (string-blank-p (string-replace (concat '(160)) "" str)))
+;;; spookfox-lib ends here
+
 ;;; spookfox-core
 ;;; Core functionality of spookfox, regarding
 ;;; - Connecting to the browser
@@ -191,7 +199,7 @@ reaching exit condition in recursive re-checks."
       (let ((prop (upcase (substring (format "%s" (pop tab)) 1)))
             (val (pop tab)))
         (cond
-         ((string= "TITLE" prop) (org-edit-headline val))
+         ((string= "TITLE" prop) (org-edit-headline (if (sf--string-banlk-p val) "<empty-title>" val)))
          ((string= "TAGS" prop) (org-set-tags val))
          (t (org-entry-put (point) prop (format "%s" val))))))
     id))
@@ -280,8 +288,9 @@ PATCH is a plist of properties to upsert."
          (let ((prop (upcase (substring (symbol-name (pop patch)) 1)))
                (val (pop patch)))
            (pcase prop
+             ;; Empty titles have been observed in the wild
+             ("TITLE" (org-edit-headline (if (sf--string-banlk-p val) "<empty-title>" val)))
              ("TAGS" (org-set-tags val))
-             ("TITLE" (org-edit-headline val))
              (_ (org-entry-put (point) prop val)))))
        (save-buffer)))))
 
@@ -294,6 +303,7 @@ PATCH is a plist of properties to upsert."
        (org-narrow-to-subtree)
        (delete-region (point-min) (point-max))
        (widen)
+       (delete-line)
        (save-buffer)))))
 
 (defun sf--tab-read ()
