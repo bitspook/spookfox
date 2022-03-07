@@ -4,7 +4,7 @@
   "name": "Spookfox",
   "version": "0.1",
   "icons": {
-    "48": "icons/message.svg"
+    "48": "icons/chained-dark.svg"
   },
 
   "browser_specific_settings": {
@@ -22,10 +22,6 @@
     "default_icon": "icons/unchained-light.svg",
     "default_title": "Chain/Unchain with Spookfox",
     "show_matches": ["<all_urls>"]
-  },
-
-  "browser_action": {
-    "default_icon": "icons/message.svg"
   },
 
   "web_accessible_resources": [

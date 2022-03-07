@@ -117,12 +117,6 @@ const run = async () => {
     sf.newState(state);
   });
 
-  browser.browserAction.onClicked.addListener(async () => {
-    const savedTabs = await sf.request('GET_SAVED_TABS');
-
-    console.warn('SAVED TABS', savedTabs);
-  });
-
   sf.registerReqHandler('GET_ACTIVE_TAB', getActiveTab);
   sf.registerReqHandler('GET_ALL_TABS', getAllTabs);
   sf.registerReqHandler('OPEN_TAB', openTab);
