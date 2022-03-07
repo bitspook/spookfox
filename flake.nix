@@ -31,6 +31,7 @@
               "rustfmt"
               "clippy"
             ];
+            targets = [ "x86_64-unknown-linux-musl" ];
           })
         ];
 
