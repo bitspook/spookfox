@@ -1,3 +1,5 @@
+import { Spookfox } from './Spookfox';
+
 /**
  * A tab saved in Emacs.
  * We need to maintain our own mapping of which tab is saved where in
@@ -67,33 +69,35 @@ export const getAllTabs = async (): Promise<SFTab[]> => {
   return tabs.map(fromBrowserTab);
 };
 
-export const openTab = async (p: {
-  tab_id: string;
-  url: string;
-}): Promise<SFTab> => {
-  let tab = null;
-  try {
-    tab = p.tab_id && (await browser.tabs.get(parseInt(p.tab_id, 10)));
-  } catch (err) {
-    // pass
+export const openTab = async (
+  p: {
+    id?: string;
+    url: string;
+  },
+  sf: Spookfox
+): Promise<SFTab> => {
+  const state = { ...sf.state };
+  if (p.id) {
+    const tab = Object.values(state.openTabs).find(
+      (t) => t.savedTabId === p.id
+    );
+
+    await browser.tabs.update(tab.id, { active: true });
+
+    return fromBrowserTab(tab);
   }
 
-  if (tab) {
-    browser.tabs.update(tab.id, { active: true });
-  } else {
-    tab = browser.tabs.create({ url: p.url });
-  }
-
-  return tab;
+  return browser.tabs.create({ url: p.url }).then(fromBrowserTab);
 };
 
 export const openTabs = async (
   tabs: {
-    tab_id: string;
+    id: string;
     url: string;
-  }[]
+  }[],
+  sf: Spookfox
 ): Promise<SFTab[]> => {
-  const openedTabs = await Promise.all(tabs.map(openTab));
+  const openedTabs = await Promise.all(tabs.map((t) => openTab(t, sf)));
 
   return openedTabs;
 };

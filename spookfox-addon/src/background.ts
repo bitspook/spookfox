@@ -91,10 +91,22 @@ const run = async () => {
         icon = `icons/chained-${iconColor}.svg`;
       }
 
-      browser.pageAction.setIcon({
-        tabId: tab.id,
-        path: icon,
-      });
+      browser.pageAction
+        .setIcon({
+          tabId: tab.id,
+          path: icon,
+        })
+        .catch((err) => {
+          if (/invalid tab id/.test(err.message.toLowerCase())) {
+            // pass. Tab has been deleted somehow, e.g Firefox containers do this
+            // rapid tab open/close dance
+            return;
+          }
+
+          console.warn(
+            `Error occurred while setting pageAction icon. [err=${err}]`
+          );
+        });
     });
   });
 
