@@ -79,15 +79,27 @@ export const openTab = async (
   const state = { ...sf.state };
   if (p.id) {
     const tab = Object.values(state.openTabs).find(
-      (t) => t.savedTabId === p.id
+      (t) => t?.savedTabId === p.id
     );
 
-    await browser.tabs.update(tab.id, { active: true });
+    if (tab) {
+      await browser.tabs.update(tab.id, { active: true });
 
-    return fromBrowserTab(tab);
+      return fromBrowserTab(tab);
+    } else {
+      // FIXME
+      // A hackish way to ensure we don't create duplicate entries in org file
+      // when a tab is opened from Emacs. Ideally, we should keep the original
+      // entry and not create a new entry at all; but since we listen to
+      // browser.tabs.onCreated event, as soon as we create a new tab, it is
+      // saved in org-file.
+      await sf.request('REMOVE_TAB', { id: p.id });
+    }
   }
 
-  return browser.tabs.create({ url: p.url }).then(fromBrowserTab);
+  const tab = await browser.tabs.create({ url: p.url });
+
+  return fromBrowserTab(tab);
 };
 
 export const openTabs = async (
