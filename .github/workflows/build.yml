@@ -52,7 +52,7 @@ jobs:
       - uses: actions/upload-artifact@v2
         with:
           name: spookfox-addon
-          path: dist/addons/*.xpi
+          path: dist/addons/
 
   release:
     name: Create a release
@@ -68,6 +68,5 @@ jobs:
 
       - name: Release
         uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
         with:
           files: ./release/*
