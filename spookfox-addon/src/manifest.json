@@ -1,8 +1,8 @@
 {
-  "description": "Native messaging example add-on",
+  "description": "Make Firefox speak to Emacs",
   "manifest_version": 2,
   "name": "Spookfox",
-  "version": "0.1",
+  "version": "0.1.0",
   "icons": {
     "48": "icons/chained-dark.svg"
   },
@@ -20,8 +20,7 @@
 
   "page_action": {
     "default_icon": "icons/unchained-light.svg",
-    "default_title": "Chain/Unchain with Spookfox",
-    "show_matches": ["<all_urls>"]
+    "default_title": "Chain/Unchain with Spookfox"
   },
 
   "web_accessible_resources": [

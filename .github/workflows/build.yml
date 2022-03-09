@@ -1,0 +1,50 @@
+name: Build the entropy site
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build_spookfox_native:
+    name: Build spookfox-native
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v1
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          components: clippy
+          target: x86_64-unknown-linux-musl
+
+      - uses: Swatinem/rust-cache@v1
+
+      - run: cargo build --release
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: spookfox-native
+          path: target/x86_64-unknown-linux-musl/release/spookfox-native
+
+  publish_firefox_addon:
+    name: Build and publish Firefox addon
+    environment: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v1
+
+      - uses: actions/setup-node@v2
+        with:
+          node-version: '16.x'
+
+      - run: yarn
+        working-directory: spookfox-addon
+
+      - run: yarn publish-addon
+        working-directory: spookfox-addon
+        env:
+          FIREFOX_ADDON_KEY: "${{ secrets.FIREFOX_ADDON_KEY }}"
+          FIREFOX_ADDON_SECRET: "${{ secrets.FIREFOX_ADDON_SECRET }}"
