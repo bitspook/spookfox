@@ -66,8 +66,8 @@ jobs:
         with:
           path: ./release
 
-      - run: mv ./release/spookfox-native ./release/spookfox-native-x86_64-linux
-      - run: mv ./release/*.xpi ./release/spookfox-firefox.xpi
+      - run: mv ./release/spookfox-native/spookfox-native ./release/spookfox-native-x86_64-linux
+      - run: mv ./release/spookfox-addon/*.xpi ./release/spookfox-firefox.xpi
 
       - name: Release
         uses: softprops/action-gh-release@v1
