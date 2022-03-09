@@ -1,4 +1,4 @@
-name: Build the entropy site
+name: Build and release
 
 on:
   push:
@@ -48,3 +48,26 @@ jobs:
         env:
           FIREFOX_ADDON_KEY: "${{ secrets.FIREFOX_ADDON_KEY }}"
           FIREFOX_ADDON_SECRET: "${{ secrets.FIREFOX_ADDON_SECRET }}"
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: spookfox-addon
+          path: dist/addons/*.xpi
+
+  release:
+    name: Create a release
+    runs-on: ubuntu-latest
+    needs:
+      - build_spookfox_native
+      - publish_firefox_addon
+    steps:
+      - uses: actions/download-artifact@v3
+        name: Download spookfox-native and spookfox-addon
+        with:
+          path: ./release
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: ./release/*
