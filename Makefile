@@ -30,6 +30,8 @@ endif
 		sed -i '/"version".*/s/"[0-9\.]*"/"$(VERSION)"/' spookfox-addon/package.json
 		sed -i '/"version".*/s/"[0-9\.]*"/"$(VERSION)"/' spookfox-addon/src/manifest.json
 		sed -i '/version.*=/s/"[0-9\.]*"/"$(VERSION)"/' spookfox-native/Cargo.toml
+		git add spookfox-addon/package.json spookfox-addon/src/manifest.json spookfox-native/Cargo.toml
+		git commit -m 'Version bump to $(VERSION)'
 		git tag -a v$(VERSION) -m "Version $(VERSION)"
 		@echo "Version set to: ${VERSION}"
 

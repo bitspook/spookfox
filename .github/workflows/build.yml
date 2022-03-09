@@ -2,8 +2,8 @@ name: Build and release
 
 on:
   push:
-    branches:
-      - master
+    tags:
+      - "v*.*.*"
 
 jobs:
   build_spookfox_native:
@@ -52,7 +52,7 @@ jobs:
       - uses: actions/upload-artifact@v2
         with:
           name: spookfox-addon
-          path: dist/addons/
+          path: spookfox-addon/dist/addons/
 
   release:
     name: Create a release
