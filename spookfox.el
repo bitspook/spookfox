@@ -403,6 +403,49 @@ Return value of HANDLER is sent back to browser as response."
 (sf--register-req-handler "UPDATE_TAB" #'sf--handle-update-tab)
 ;;; spookfox-request-handlers ends here
 
+;;; spookfox-native
+(defvar spookfox-native-installation-dir (expand-file-name "spookfox" (concat user-emacs-directory "/.cache/"))
+  "Location where spookfox-native will download the spookfox-binary.")
+
+(defvar sf--native-installation-location (expand-file-name "spookfox-native" spookfox-native-installation-dir))
+
+(defvar spookfox-version "0.1.8"
+  "Spookfox version.")
+
+(defun sf--download-native ()
+  "Download spookfox-native into `spookfox-native-installation-dir'."
+  (when (not (file-exists-p spookfox-native-installation-dir))
+    (let* ((src-file "spookfox-native-x86_64-linux")
+           (src (concat "https://github.com/bitspook/spookfox/releases/download/v"
+                        spookfox-version "/" src-file)))
+      (mkdir spookfox-native-installation-dir t)
+      (url-copy-file src sf--native-installation-location)
+      ;; (rename-file (expand-file-name src-file dest) sf--native-installation-location)
+      (chmod sf--native-installation-location 365))))
+
+(defun sf--native-manifest ()
+  "Provide JSON manifest for spookfox-native."
+  (json-encode `(:name "spookfox"
+                 :description "Communicate between Emacs and Firefox"
+                 :path ,sf--native-installation-location
+                 :type "stdio"
+                 :allowed_extensions ,(list "spookfox@bitspook.in"))))
+
+(defun sf--native-manifest-location ()
+  "Return location where spookfox-native manifest should be stored."
+  (pcase system-type
+    ('gnu/linux (expand-file-name "spookfox.json" (concat "~/.mozilla/native-messaging-hosts")))
+    (_ (error "Unsupported system. Only gnu/linux is supported"))))
+
+(defun sf--install-native ()
+  "Download spookfox-native, and write spookfox-native manifest."
+  (mkdir (file-name-directory (sf--native-manifest-location)) t)
+  (sf--download-native)
+  (with-temp-buffer
+    (insert (sf--native-manifest))
+    (write-file (sf--native-manifest-location))))
+;;; spookfox-native ends here
+
 ;;; spookfox-interactive-functions
 (defun spookfox-save-all-tabs ()
   "Save all currently open browser tabs at `spookfox-saved-tabs-target`.
@@ -445,6 +488,21 @@ make changes."
                                         ; spookfox-request can parse it again
                                         ; into a proper JSON array
       (concat "[" (string-join (mapcar #'json-encode group-tabs) ",") "]")))))
+
+(defun spookfox-install-native ()
+  "Download and install spookfox-native.
+Interactively prompt to delete existing installation, if present."
+  (interactive)
+  (when (file-exists-p (sf--native-manifest-location))
+    (when (yes-or-no-p "Existing spookfox-native manifest found. Delete it?")
+      (delete-directory (file-name-directory (sf--native-manifest-location)) t)))
+
+  (when (file-exists-p spookfox-native-installation-dir)
+    (if (yes-or-no-p "Existing spookfox-native binary found. Delete it?")
+        (delete-directory spookfox-native-installation-dir t)
+      (message "Proceeding without re-downloading.")))
+
+  (sf--install-native))
 ;;; spookfox-interactive-functions ends here
 
 (spookfox-ensure-connection)
