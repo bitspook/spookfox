@@ -75,14 +75,14 @@ const run = async () => {
   });
 
   // Ensure page-action icons (chained icon) for all tabs are always correct
-  sf.addEventListener(SFEvents.NEW_STATE, (e: SFEvent<State>) => {
+  sf.addEventListener(SFEvents.NEW_STATE, async (e: SFEvent<State>) => {
     const state = e.payload;
     const tabs = Object.values(state.openTabs);
     const iconColor = window.matchMedia('(prefers-color-scheme: dark)').matches
       ? 'light'
       : 'dark';
 
-    tabs.forEach((tab) => {
+    tabs.forEach(async (tab) => {
       if (!tab || !tab.id) return;
       const savedTab = state.savedTabs[tab.savedTabId];
       let icon = `icons/unchained-${iconColor}.svg`;
@@ -91,23 +91,20 @@ const run = async () => {
         icon = `icons/chained-${iconColor}.svg`;
       }
 
-      browser.pageAction
-        .setIcon({
-          tabId: tab.id,
-          path: icon,
-        })
-        .catch((err) => {
-          if (/invalid tab id/.test(err.message.toLowerCase())) {
-            // pass. Tab has been deleted somehow, e.g Firefox containers do this
-            // rapid tab open/close dance
-            return;
-          }
+      try {
+        await browser.pageAction.setIcon({ tabId: tab.id, path: icon });
+        browser.pageAction.show(tab.id);
+      } catch (err) {
+        if (/invalid tab id/.test(err.message.toLowerCase())) {
+          // pass. Tab has been deleted somehow, e.g Firefox containers do this
+          // rapid tab open/close dance
+          return;
+        }
 
-          console.warn(
-            `Error occurred while setting pageAction icon. [err=${err}]`
-          );
-        });
-      browser.pageAction.show(tab.id);
+        console.warn(
+          `Error occurred while setting pageAction icon. [err=${err}]`
+        );
+      }
     });
   });
 
