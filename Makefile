@@ -21,6 +21,12 @@ else
 	@echo "Versions look ok."
 endif
 
+set-version:
+	sed -i '/"version".*/s/"[0-9\.]*"/"$(VERSION)"/' spookfox-addon/package.json
+	sed -i '/"version".*/s/"[0-9\.]*"/"$(VERSION)"/' spookfox-addon/src/manifest.json
+	sed -i '/version.*=/s/"[0-9\.]*"/"$(VERSION)"/' spookfox-native/Cargo.toml
+	@echo "Version set to: ${VERSION}"
+
 clean:
 	rm -r spookfox-addon/dist
 	cargo clean
