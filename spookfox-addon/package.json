@@ -1,11 +1,12 @@
 {
   "name": "spookfox",
-  "version": "0.1.0",
+  "version": "0.1.8",
   "license": "GPLv3",
   "scripts": {
     "start": "parcel serve src/manifest.json",
     "build": "parcel build src/manifest.json",
-    "lint": "eslint src/ && tsc"
+    "lint": "eslint src/ && tsc",
+    "publish-addon": "yarn build && web-ext sign -s ./dist -a ./dist/addons --api-key $FIREFOX_ADDON_KEY --api-secret $FIREFOX_ADDON_SECRET"
   },
   "devDependencies": {
     "@parcel/config-webextension": "^2.3.2",
@@ -17,6 +18,7 @@
     "parcel": "^2.3.2",
     "prettier": "^2.5.1",
     "typescript": "^4.5.5",
+    "web-ext": "^6.7.0",
     "web-ext-types": "^3.2.1"
   },
   "dependencies": {

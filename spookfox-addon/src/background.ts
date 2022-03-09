@@ -107,6 +107,7 @@ const run = async () => {
             `Error occurred while setting pageAction icon. [err=${err}]`
           );
         });
+      browser.pageAction.show(tab.id);
     });
   });
 
