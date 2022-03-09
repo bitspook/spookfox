@@ -127,7 +127,7 @@ is set accordingly."
   (ignore-errors (sf--connect))
 
   (let* ((retry-count (or retry-count 0))
-         (retry-after (min (* retry-count 2) 15)))
+         (retry-after (min (* retry-count 2) spookfox-max-reconnect-retry-interval)))
     (when (not (sf--connected-p))
       (when (> retry-after 2) (message "Will retry spookfox connection after %ss" retry-after)) ;so we don't spam for momentary reconnects
       (setq sf--reconnect-timer (run-with-timer retry-after nil 'spookfox-ensure-connection (1+ retry-count))) )))
@@ -474,7 +474,7 @@ make changes."
       (spookfox-request "SEARCH_FOR" tab)))))
 
 (defun spookfox-open-tab-group ()
-  "Prompt user to select a tab group, and open all tabs in it."
+  "Prompt for a tab group, and open all tabs belonging to that group."
   (interactive)
   (let* ((tabs (sf--get-saved-tabs))
          (groups (seq-uniq (seq-mapcat (lambda (tab) (plist-get tab :tags)) tabs)))

@@ -1,0 +1,70 @@
+If you are looking to contribute to spookfox's development, please follow this
+guide to setup a development environment. I am going to assume you are on a
+Linux machine, and have cloned this repo.
+
+** Setup
+
+*** Without Nix
+
+If you don't have [[https://nixos.org/][Nix]] installed, you will need to make sure that following
+software are available in your =$PATH=.
+
+1. Cargo, for building spookfox Native
+2. Node.js, for building the spookfox add-on
+
+*** With Nix
+
+If you have Nix installed, you can just do =nix-shell= to drop into an already
+setup development environment. Or if you are using [[https://direnv.net/][direnv]], just do a =direnv
+allow= to achieve the same.
+
+** Install spookfox-native
+
+1. =cd spookfox-native=
+2. =cargo build=
+3. Edit =spookfox-native/spookfox.json= and change =path= property in it to
+   ensure it points to your home directory. Please note that =path= should be an
+   absolute path, =~/= do not work, it should be =/home/me/=.
+4. =ln -s <path-to-spookfox>/spookfox-native/spookfox.json ~/.mozilla/native-messaging-hosts/=
+
+** Install the addon
+
+1. =cd spookfox-addon=
+2. =yarn=
+3. =yarn start=
+4. Install in Firefox
+   1. Open Firefox
+   2. Go to [[about:addons][about:addons]]
+   3. Click on the gear icon and select "*Debug Add-Ons*"
+   4. Click on "*Load Temporary Add-on*" button
+   5. Navigate to the =spookfox-addon/dist= directory, and click =Open=
+
+Any changes you make to typescript/html/scss now will automatically rebuild. But
+you will still need to click on =Reload= button on *Debug Add-Ons* firefox page.
+
+** Install spookfox.el
+
+*** Using straight.el
+
+You can use straight.el to install it directly from where you've clone this
+repo.
+
+#+begin_src elisp
+  (use-package spookfox
+    :straight (spookfox :type git
+                        :local-repo "~/Documents/work/spookfox"
+                        :file "spookfox.el")
+    :config
+    (setq spookfox-saved-tabs-target `(file+headline ,(expand-file-name "spookfox.org" org-directory) "Tabs")))
+#+end_src
+
+This is how I install it in [[https://github.com/bitspook/spookmax.d/][my config]].
+
+*** Using =load-file=
+
+You can also simply use
+
+#+begin_src elisp
+  (load-file "<path-to-spookfox>/spookfox.el")
+  (require 'spookfox)
+#+end_src

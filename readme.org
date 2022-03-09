@@ -8,132 +8,44 @@ over the place.
 #+end_quote
 
 #+begin_quote
-*Windows is not supported right now.* At this stage I can only test spookfox on
-Linux, but it should theoretically work with Mac as well.
+*Windows is not supported right now.* At this stage I have only tested spookfox
+on Linux, but it should *theoretically* work with Mac as well.
 #+end_quote
-
-** Installation
-
-Since I haven't figured out convenient packaging yet, please do the following
-manual steps to set things up. I am going to assume you are on a Linux machine,
-and have cloned this repo.
-
-*** Setup
-
-**** Without Nix
-
-If you don't have [[https://nixos.org/][Nix]] installed, you will need to make sure that following
-software are available in your =$PATH=.
-
-1. Cargo, for building spookfox Native
-2. Node.js, for building the spookfox add-on
-
-**** With Nix
-
-If you have Nix installed, you can just do =nix-shell= to drop into an already
-setup development environment. Or if you are using [[https://direnv.net/][direnv]], just do a =direnv
-allow= to achieve the same.
-
-*** Install spookfox-native
-
-1. =cd spookfox-native=
-2. =cargo build=
-3. Edit =spookfox-native/spookfox.json= and change =path= property in it to
-   ensure it points to your home directory.
-4. =ln -s <path-to-spookfox>/spookfox-native/spookfox.json ~/.mozilla/native-messaging-hosts/=
-
-Make sure to replace ~<path-to-spookfox>~ in #3 above with where you've cloned
-the repo.
-
-*** Install the addon
-
-1. =cd spookfox-addon=
-2. =yarn=
-3. =yarn build=
-4. Install in Firefox
-   1. Open Firefox
-   2. Go to [[about:addons][about:addons]]
-   3. Click on the gear icon and select "*Debug Add-Ons*"
-   4. Click on "*Load Temporary Add-on*" button
-   5. Navigate to the =spookfox-addon/dist= directory, and click =Open=
-
-*** Install spookfox.el
-
-**** Using straight.el
-
-Since spookfox is in early development, it is not release on Melpa yet. You can
-use straight.el to install it directly from where you've clone this repo.
-
-#+begin_src elisp
-  (use-package spookfox
-    :straight (spookfox :type git
-                        :local-repo "~/Documents/work/spookfox"
-                        :file "spookfox.el")
-    :config
-    (setq spookfox-saved-tabs-target `(file+headline ,(expand-file-name "spookfox.org" org-directory) "Tabs")))
-#+end_src
-
-This is how I install it in [[https://github.com/bitspook/spookmax.d/][my config]].
-
-**** Using =load-file=
-
-You can also simply use
-
-#+begin_src elisp
-  (load-file "<path-to-spookfox>/spookfox.el")
-  (require 'spookfox)
-#+end_src
-
 
 ** Features
 
-1. Save all open tabs as org-mode subtrees.
+1. *Chained tabs*: use Emacs for tab management
+
+   Every time you open a new tab in browser, an org entry is created in
+   =spookfox-saved-tabs-target= (details below). The tab and this entry stay in
+   sync (i.e URL changes are synced, closing the tab removes the org entry),
+   unless you "unchain" the tab using a button provided in browser.
+
+   On "unchain", the browser tab is free and changes to it (including closing)
+   aren't written back to Emacs.
+
+2. *Archived tabs*: Maintain tabs as org-mode subtrees
 
    I have a habit of opening too many browser tabs open, many of which I don't
    even visit as often. Although the browser would discard the tab to save
    resources, it is still clutter. And too easy to accidentally click on it and
    waste precious CPU/RAM.
 
-   To remedy that, we can save all the browser tabs open in the browser right
-   now in an org file. Configure the [[https://orgmode.org/manual/Template-elements.html][target]]:
+   Using =M-x spookfox-save-all-tabs= I can quickly capture save all open tabs
+   into my spookfox.org, and keep only necessary tabs open in browser.
 
-   #+begin_src elisp
-     (setq spookfox-saved-tabs-target '(file+headline "~/org/browser.org" "Open Tabs"))
-   #+end_src
+   Note: =spookfox-save-all-tabs= will not close open tabs in browser. You can
+   have that pleasure yourself.
 
-   Now you can save all your currently open browser tabs in the configured target.
-
-   #+begin_src elisp
-     (spookfox-save-all-tabs)
-   #+end_src
-
-   This will open an org capture buffer where you can preview and change the
-   tabs as org nodes before saving.
-
-   Note: This will not close open tabs in browser. You can have that pleasure
-   yourself.
-
-   *Organize tabs into groups*
+3. *Organize tabs*: as groups
 
    It is possible to create "tab groups" using org-mode tags. Applying a tag on
-   a tab node will make it a member of that tab group. Since the org subtree of
-   tabs can be organized in any hierarchy, you can use this to apply a tag on
-   multiple tabs.
+   a tab node will make it a member of that tab-group. Org subtree of tabs can
+   be organized in any hierarchy as long as the you maintain the integrity of
+   properties spookfox added to =:PROPERTIES:= drawer.
 
-2. Open a saved tab
-
-   Once you have saved the gazillion tabs you had open in your browser, you can
-   structure them in the =spookfox-saved-tabs-target= any way you desire, as
-   long as the you maintain the integrity of properties spookfox added to
-   =:PROPERTIES:= drawer.
-
-   You can use =spookfox-open-tab= to select one of the saved tabs and open it
-   in the browser connected via spookfox. It uses Emacs' built-in completion, so
-   if you are using something like ivy or helm you might see a completion UI.
-
-   #+begin_src elisp
-     (spookfox-open-tab)
-   #+end_src
+   =M-x spookfox-open-tab= and =M-x spookfox-open-tab-group= can be used to open
+   a single tab, or all tabs belonging to a group.
 
    *Behavior*:
 
@@ -145,17 +57,6 @@ You can also simply use
        opened. Else a search with your configured search engine is performed in
        the new tab.
 
-3. Open a tab group
-
-   You can open a group of tabs using =spookfox-open-tab-group=. It will open
-   all the tabs that belong to the group in current browser. If a tab is already
-   open, it is not reopened but will be awoken if it is in discarded state
-   (browsers do that to save resources).
-
-   #+begin_src elisp
-     (spookfox-open-tab-group)
-   #+end_src
-
 4. Get active tab
 
   #+begin_src elisp
@@ -165,6 +66,71 @@ You can also simply use
   #+RESULTS:
   | :id | 97 | :isPinned | :false | :title | permissions - Mozilla | MDN | :url | https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/manifest.json/permissions |
 
-  I use this to quickly capture notes for what I am reading in Firefox. This is
+  I use this to [[https://github.com/bitspook/spookmax.d/blame/d3001ee80a86b9d3c2eb476a0b9fa747b8a96fce/readme.org#L126-L137][quickly capture notes]] for what I am reading in Firefox. This is
   not an interactive command (i.e you can't call it with =M-x=), because what
   would you want to do that for?
+
+** Installation
+
+There are 3 parts to install spookfox.
+
+1. Install the browser addon
+
+   Download the addon (=.xpi= file) from [[https://github.com/bitspook/spookfox/releases/][releases page]], since it is not [[https://addons.mozilla.org/en-US/firefox/addon/spookfox/][approved
+   on Firefox addons]] yet. Firefox will prompt you to install as soon as you
+   download it.
+
+2. Install Emacs package
+
+   You can use straight.el to install it directly from where you've clone this
+   repo.
+
+   #+begin_src elisp
+     (straight-use-package
+      '(spookfox :type git :host github :repo "bitspook/spookfox" :file "spookfox.el"))
+   #+end_src
+
+   OR You can also simply clone this repo and use
+
+   #+begin_src elisp
+     (load-file "<path-to-spookfox>/spookfox.el")
+     (require 'spookfox)
+   #+end_src
+
+3. Use Emacs package to install =spookfox-native=, which is the glue code for
+   communication b/w Emacs and browser
+
+   Once spookfox.el is installed, you can call
+   src_elisp{spookfox-install-native} interactively (by pressing =M-x=) in Emacs
+   to install the final piece. *Note* this will only work on Linux.
+
+** Configuration
+
+Following variables are available to configure some aspects of spookfox.
+
+1. =spookfox-saved-tabs-target=
+
+   =spookfox-saved-tabs-target= is an [[https://orgmode.org/manual/Template-elements.html][org-capture-templates target]], where the
+   browser tabs are saved.
+
+   #+begin_src elisp
+     (setq spookfox-saved-tabs-target '(file+headline (expand-file-name "spookfox.org" org-directory)))
+   #+end_src
+
+2. =spookfox-max-reconnect-retry-interval=
+
+   Spookfox maintains a socket connection with the browser using browser
+   [[https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Native_messaging][native-messaging]]. This connection can sometimes break (e.g because browser
+   isn't open, extension isn't installed etc), to remedy which spookfox tries to
+   reconnect after an incrementing interval until a connection is established.
+   =spookfox-max-reconnect-retry-interval= is the maximum number of seconds
+   spookfox will wait between two retry attempts.
+
+   #+begin_src elisp
+     (setq spookfox-max-reconnect-retry-interval 30)
+   #+end_src
+
+3. =spookfox-native-installation-dir=
+
+   This is the directory in which spookfox will download and save
+   spookfox-native binary (from the [[https://github.com/bitspook/spookfox/releases/][releases page]]).
