@@ -409,7 +409,7 @@ Return value of HANDLER is sent back to browser as response."
 
 (defvar sf--native-executable (expand-file-name "spookfox-native" spookfox-native-installation-dir))
 
-(defvar spookfox-version "0.1.8"
+(defvar spookfox-version "0.1.9"
   "Spookfox version.")
 
 (defun sf--download-native ()
