@@ -405,29 +405,29 @@ Return value of HANDLER is sent back to browser as response."
 
 ;;; spookfox-native
 (defvar spookfox-native-installation-dir (expand-file-name "spookfox" (concat user-emacs-directory "/.cache/"))
-  "Location where spookfox-native will download the spookfox-binary.")
+  "Location where spookfox-native will download the spookfox-native executable.")
 
-(defvar sf--native-installation-location (expand-file-name "spookfox-native" spookfox-native-installation-dir))
+(defvar sf--native-executable (expand-file-name "spookfox-native" spookfox-native-installation-dir))
 
 (defvar spookfox-version "0.1.8"
   "Spookfox version.")
 
 (defun sf--download-native ()
   "Download spookfox-native into `spookfox-native-installation-dir'."
-  (when (not (file-exists-p spookfox-native-installation-dir))
+  (when (not (file-exists-p sf--native-executable))
     (let* ((src-file "spookfox-native-x86_64-linux")
            (src (concat "https://github.com/bitspook/spookfox/releases/download/v"
                         spookfox-version "/" src-file)))
       (mkdir spookfox-native-installation-dir t)
-      (url-copy-file src sf--native-installation-location)
-      ;; (rename-file (expand-file-name src-file dest) sf--native-installation-location)
-      (chmod sf--native-installation-location 365))))
+      (url-copy-file src sf--native-executable)
+      ;; (rename-file (expand-file-name src-file dest) sf--native-executable)
+      (chmod sf--native-executable 365))))
 
 (defun sf--native-manifest ()
   "Provide JSON manifest for spookfox-native."
   (json-encode `(:name "spookfox"
                  :description "Communicate between Emacs and Firefox"
-                 :path ,sf--native-installation-location
+                 :path ,sf--native-executable
                  :type "stdio"
                  :allowed_extensions ,(list "spookfox@bitspook.in"))))
 
@@ -495,11 +495,11 @@ Interactively prompt to delete existing installation, if present."
   (interactive)
   (when (file-exists-p (sf--native-manifest-location))
     (when (yes-or-no-p "Existing spookfox-native manifest found. Delete it?")
-      (delete-directory (file-name-directory (sf--native-manifest-location)) t)))
+      (delete-file (sf--native-manifest-location))))
 
-  (when (file-exists-p spookfox-native-installation-dir)
-    (if (yes-or-no-p "Existing spookfox-native binary found. Delete it?")
-        (delete-directory spookfox-native-installation-dir t)
+  (when (file-exists-p sf--native-executable)
+    (if (yes-or-no-p "Existing spookfox-native executable found. Delete it?")
+        (delete-file sf--native-executable)
       (message "Proceeding without re-downloading.")))
 
   (sf--install-native))
