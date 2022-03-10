@@ -79,7 +79,7 @@ const run = async () => {
     const openTabs = { ...sf.state.openTabs };
     openTabs[`${tabId}`] = updatedTab;
 
-    sf.newState({ ...sf.state, openTabs }, 'UPDATED_TAB');
+    sf.newState({ ...sf.state, openTabs }, `UPDATED_TAB ${tabId}`);
   });
 
   // For debugging state transitions

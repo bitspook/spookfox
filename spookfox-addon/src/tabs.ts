@@ -76,9 +76,8 @@ export const openTab = async (
   },
   sf: Spookfox
 ): Promise<SFTab> => {
-  const state = { ...sf.state };
   if (p.id) {
-    const tab = Object.values(state.openTabs).find(
+    const tab = Object.values(sf.state.openTabs).find(
       (t) => t?.savedTabId === p.id
     );
 
@@ -87,8 +86,12 @@ export const openTab = async (
         await browser.tabs.update(tab.id, { active: true });
       } catch (err) {
         if (/invalid tab id/.test(err.message.toLowerCase())) {
-          state.openTabs[`${tab.id}`] = null;
-          sf.newState(state);
+          const openTabs = { ...sf.state.openTabs };
+          delete openTabs[`${tab.id}`];
+          sf.newState(
+            { ...sf.state, openTabs },
+            `OPEN_SAVED_TAB [id=${p.id}, url=${p.url}]`
+          );
         }
       }
 

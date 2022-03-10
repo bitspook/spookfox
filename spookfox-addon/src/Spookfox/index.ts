@@ -168,12 +168,12 @@ export class Spookfox extends EventTarget {
    * # Example
    * ```
    * const newState = { ... };
-   * sf.newState(newState);
+   * sf.newState(newState, 'X kind of change.');
    * ```
    */
-  newState(s: State, msg?: string) {
+  newState(s: State, debugMsg?: string) {
     this.state = s;
-    this.dispatch(SFEvents.NEW_STATE, s, msg);
+    this.dispatch(SFEvents.NEW_STATE, s, debugMsg);
   }
 
   /**
@@ -276,7 +276,7 @@ export class Spookfox extends EventTarget {
         savedTabs: savedTabsMap,
       };
 
-      this.newState(newState);
+      this.newState(newState, 'INITIAL_STATE');
     });
   }
 
