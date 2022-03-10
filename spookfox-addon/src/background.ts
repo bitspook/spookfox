@@ -1,4 +1,3 @@
-import { v4 as uuid } from 'uuid';
 import { Spookfox, SFEvent, SFEvents, State } from './Spookfox';
 import {
   SFTab,
@@ -20,16 +19,33 @@ const run = async () => {
   const sf = ((window as any).sf = new Spookfox());
 
   browser.tabs.onCreated.addListener(async (tab) => {
-    const state = { ...sf.state };
-    // This will insert a new tab, and set it in `(:chained t)` state
+    sf.newState(
+      {
+        ...sf.state,
+        openTabs: { ...sf.state.openTabs, [`${tab.id}`]: tab },
+        savingTabs: sf.state.savingTabs.concat([tab.id]),
+      },
+      `SAVING_TAB ${tab.id}`
+    );
+
     const savedTab = (await sf.request(
       'TOGGLE_TAB_CHAINING',
       fromBrowserTab(tab)
     )) as SFTab;
-    state.savedTabs[savedTab.id] = savedTab;
-    state.openTabs[`${tab.id}`] = { ...tab, savedTabId: savedTab.id };
+    const savedTabs = { ...sf.state.savedTabs };
+    const openTabs = { ...sf.state.openTabs };
+    savedTabs[savedTab.id] = savedTab;
+    openTabs[`${tab.id}`] = { ...tab, savedTabId: savedTab.id };
 
-    sf.newState(state);
+    sf.newState(
+      {
+        ...sf.state,
+        savingTabs: sf.state.savingTabs.filter((id) => id !== tab.id),
+        savedTabs,
+        openTabs,
+      },
+      `SAVED_TAB ${tab.id}`
+    );
   });
 
   browser.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
@@ -43,35 +59,53 @@ const run = async () => {
       return;
     }
 
-    const state = { ...sf.state };
-    const tab = state.openTabs[`${tabId}`];
-    const savedTab = state.savedTabs[tab.savedTabId];
+    const tab = sf.state.openTabs[`${tabId}`];
+    const savedTab = sf.state.savedTabs[tab.savedTabId];
     const updatedTab = { ...tab, ...changeInfo };
-    state.openTabs[`${tabId}`] = updatedTab;
 
     if (savedTab?.chained) {
-      await sf.request(
-        'UPDATE_TAB',
-        // augment with savedTab for Emacs side properties like 'chained'
-        fromBrowserTab({ ...savedTab, ...updatedTab } as OpenTab)
-      );
+      try {
+        await sf.request(
+          'UPDATE_TAB',
+          // augment with savedTab for Emacs side properties like 'chained'
+          fromBrowserTab({ ...savedTab, ...updatedTab } as OpenTab)
+        );
+      } catch (err) {
+        console.warn(
+          `Error during updating tabs. [tabId=${tabId}, err=${err}]`
+        );
+      }
     }
+    const openTabs = { ...sf.state.openTabs };
+    openTabs[`${tabId}`] = updatedTab;
 
-    sf.newState(state);
+    sf.newState({ ...sf.state, openTabs }, 'UPDATED_TAB');
   });
+
+  // For debugging state transitions
+  sf.addEventListener(SFEvents.NEW_STATE, (e: SFEvent) => {
+    if (!localStorage.getItem('DEBUG_NEW_STATE')) return;
+    console.groupCollapsed(`${e.name} ${e.debugMessage || ''}`);
+    console.log(e.payload);
+    console.groupEnd();
+  });
+
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
   browser.tabs.onRemoved.addListener(async (tabId, { windowId }) => {
     if (windowId !== 1) return;
-    const state = { ...sf.state };
-    const tab = state.openTabs[`${tabId}`];
-    const savedTab = state.savedTabs[tab.savedTabId];
+    if (sf.state.savingTabs.includes(tabId)) await sleep(600);
+
+    const tab = sf.state.openTabs[`${tabId}`];
+    const savedTab = sf.state.savedTabs[tab.savedTabId];
 
     if (savedTab?.chained) {
       await sf.request('REMOVE_TAB', fromBrowserTab(tab));
     }
-    state.openTabs[`${tabId}`] = null;
+    const openTabs = { ...sf.state.openTabs };
+    delete openTabs[`${tabId}`];
 
-    sf.newState(state);
+    sf.newState({ ...sf.state, openTabs }, `REMOVED_TAB ${tabId}`);
   });
 
   // Ensure page-action icons (chained icon) for all tabs are always correct
@@ -124,7 +158,7 @@ const run = async () => {
     state.openTabs[`${tab.id}`].savedTabId = savedTab.id;
     state.savedTabs[savedTab.id] = savedTab;
 
-    sf.newState(state);
+    sf.newState(state, 'CLICKED_PAGE_ACTION');
   });
 
   sf.registerReqHandler('GET_ACTIVE_TAB', getActiveTab);
@@ -134,4 +168,6 @@ const run = async () => {
   sf.registerReqHandler('SEARCH_FOR', searchFor);
 };
 
-run();
+run().catch((err) => {
+  console.error('An error occurred in run()', err);
+});

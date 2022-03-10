@@ -20,6 +20,10 @@ allow= to achieve the same.
 
 ** Install spookfox-native
 
+Note: If you are not going to make any changes in rust code, you don't need to
+do this step. You can simply =M-x spookfox-install-native= and use the
+downloaded binary.
+
 1. =cd spookfox-native=
 2. =cargo build=
 3. Edit =spookfox-native/spookfox.json= and change =path= property in it to
@@ -68,3 +72,25 @@ You can also simply use
   (load-file "<path-to-spookfox>/spookfox.el")
   (require 'spookfox)
 #+end_src
+
+
+** Tips
+
+*** Debugging the Firefox addon
+
+- Access addon's developer console
+
+  In Firefox go to [[about:addons]], click /Gear Icon > Debug Addons > Inspect(in
+  Spookfox box)/. This will open a developer console where you can see messages
+  logged by the addon. There is also a global variable =sf= available which you
+  can play with.
+
+- Log NEW_STATE events
+
+  Mutable state proves to be the issue behind a lot of bugs. If you find
+  yourself in position where you want to troubleshoot a bug, set
+  =DEBUG_NEW_STATE= to a truth-y value in =localStorage= i.e
+
+  #+begin_src js
+    localStorage.setItem('DEBUG_NEW_STATE', 1)
+  #+end_src

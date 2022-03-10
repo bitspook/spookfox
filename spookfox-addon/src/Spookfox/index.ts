@@ -28,6 +28,16 @@ export interface State {
   // list again, or designing the response such that Emacs returns the updated
   // `SFTab`
   savedTabs: { [id: string]: SFTab };
+  // Firefox containers, when configured to "auto-close tabs" cause a
+  // race-condition where they rapidly create+close+create tabs. In this case,
+  // the close callback gets called very quickly. On tab create, Emacs save the
+  // tab and respond with the saved tab. But before it can do this, Firefox has
+  // already closed the tab and emitted onClosed event. onClosed checks if we
+  // already saved the tab, and since saving the tab hasn't finished yet,
+  // concludes that we haven't. So this rapidly closed tab don't get removed
+  // from Emacs. To resolve this, we need a `savingTabs` which keeps track if
+  // tabs which are under-process of being saved.
+  savingTabs: number[];
 }
 
 /**
@@ -52,7 +62,11 @@ export enum SFEvents {
  * A custom event which has an optional payload attached.
  */
 export class SFEvent<P = any> extends Event {
-  constructor(public name: string, public payload?: P) {
+  constructor(
+    public name: string,
+    public payload?: P,
+    public debugMessage?: string
+  ) {
     super(name);
   }
 }
@@ -83,6 +97,7 @@ export class Spookfox extends EventTarget {
   state: State = {
     openTabs: {},
     savedTabs: {},
+    savingTabs: [],
   };
   reqHandlers = {};
 
@@ -94,6 +109,7 @@ export class Spookfox extends EventTarget {
     this.setupRequestHandler();
     this.setupResponseHandler();
     this.initStateOnReconnect();
+    this.setupDisconnectHandler();
   }
 
   /**
@@ -119,8 +135,8 @@ export class Spookfox extends EventTarget {
   /**
    * A convenience function for dispatching new events to `Spookfox`.
    */
-  dispatch(name: string, payload?: object) {
-    this.dispatchEvent(new SFEvent(name, payload));
+  dispatch(name: string, payload?: object, msg?: string) {
+    this.dispatchEvent(new SFEvent(name, payload, msg));
   }
   /**
    * Run a function when Emacs makes a request.
@@ -155,9 +171,9 @@ export class Spookfox extends EventTarget {
    * sf.newState(newState);
    * ```
    */
-  newState(s: State) {
+  newState(s: State, msg?: string) {
     this.state = s;
-    this.dispatch(SFEvents.NEW_STATE, s);
+    this.dispatch(SFEvents.NEW_STATE, s, msg);
   }
 
   /**
@@ -261,6 +277,15 @@ export class Spookfox extends EventTarget {
       };
 
       this.newState(newState);
+    });
+  }
+
+  /**
+   * Handle disconnection from spookfox.
+   */
+  private setupDisconnectHandler() {
+    this.addEventListener(SFEvents.DISCONNECTED, (err) => {
+      console.warn('Spookfox disconnected. [err=', err, ']');
     });
   }
 }

@@ -83,9 +83,16 @@ export const openTab = async (
     );
 
     if (tab) {
-      await browser.tabs.update(tab.id, { active: true });
+      try {
+        await browser.tabs.update(tab.id, { active: true });
+      } catch (err) {
+        if (/invalid tab id/.test(err.message.toLowerCase())) {
+          state.openTabs[`${tab.id}`] = null;
+          sf.newState(state);
+        }
+      }
 
-      return fromBrowserTab(tab);
+      return null;
     } else {
       // FIXME
       // A hackish way to ensure we don't create duplicate entries in org file
