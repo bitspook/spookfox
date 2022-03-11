@@ -60,7 +60,7 @@ on Linux, but it should *theoretically* work with Mac as well.
 4. Get active tab
 
   #+begin_src elisp
-  (sf--get-active-tab)
+  (sf--request-active-tab)
   #+end_src
 
   #+RESULTS:
