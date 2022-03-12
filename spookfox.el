@@ -23,7 +23,7 @@
 (defvar sf--last-response nil
   "Most recently received response from browser.")
 
-(defvar spookfox-saved-tabs-target '(file+headline (expand-file-name "spookfox.org" org-directory) "Tabs")
+(defvar spookfox-saved-tabs-target `(file+headline ,(expand-file-name "spookfox.org" org-directory) "Tabs")
   "Target parse-able by org-capture-template where browser tabs will be saved.")
 
 (defvar sf--tab-history nil

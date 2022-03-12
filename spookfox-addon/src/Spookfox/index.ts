@@ -93,7 +93,6 @@ export class SFEvent<P = any> extends Event {
 // custom events. We rely on custom events to build independent modules, while
 // providing a unified interface.
 export class Spookfox extends EventTarget {
-  port: browser.runtime.Port;
   state: State = {
     openTabs: {},
     savedTabs: {},
@@ -101,15 +100,24 @@ export class Spookfox extends EventTarget {
   };
   reqHandlers = {};
 
-  constructor(port?: browser.runtime.Port) {
+  constructor(public port?: browser.runtime.Port) {
     super();
-    this.port = port || browser.runtime.connectNative('spookfox');
+    if (!port) {
+      this.connect();
+    }
 
     setupBroker(this);
     this.setupRequestHandler();
     this.setupResponseHandler();
     this.initStateOnReconnect();
     this.setupDisconnectHandler();
+  }
+
+  private connect() {
+    if (this.port) this.port.disconnect();
+
+    this.port = browser.runtime.connectNative('spookfox');
+    return this.port;
   }
 
   /**
@@ -221,15 +229,19 @@ export class Spookfox extends EventTarget {
   }
 
   private getResponse(requestId: string) {
-    // FIXME: It is possible that this promise will never resolve, if for some
-    // reason Emacs failed to respond. We should probably add a timeout here to
-    // reject the promise if we don't get a response in X time
-    return new Promise((resolve) => {
+    const maxWait = 2000;
+
+    return new Promise((resolve, reject) => {
       const listener = (event: SFEvent) => {
+        clearTimeout(killTimer);
         this.removeEventListener(requestId, listener);
 
         resolve(event.payload);
       };
+      const killTimer = setTimeout(() => {
+        this.removeEventListener(requestId, listener);
+        reject(new Error('Spookfox response timeout.'));
+      }, maxWait);
 
       this.addEventListener(requestId, listener);
     });

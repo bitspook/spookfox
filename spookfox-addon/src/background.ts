@@ -1,3 +1,4 @@
+import { sleep } from './lib';
 import { Spookfox, SFEvent, SFEvents, State } from './Spookfox';
 import {
   SFTab,
@@ -64,18 +65,17 @@ const run = async () => {
     const updatedTab = { ...tab, ...changeInfo };
 
     if (savedTab?.chained) {
-      try {
-        await sf.request(
-          'UPDATE_TAB',
-          // augment with savedTab for Emacs side properties like 'chained'
-          fromBrowserTab({ ...savedTab, ...updatedTab } as OpenTab)
-        );
-      } catch (err) {
+      sf.request(
+        'UPDATE_TAB',
+        // augment with savedTab for Emacs side properties like 'chained'
+        fromBrowserTab({ ...savedTab, ...updatedTab } as OpenTab)
+      ).catch((err) => {
         console.warn(
           `Error during updating tabs. [tabId=${tabId}, err=${err}]`
         );
-      }
+      });
     }
+
     const openTabs = { ...sf.state.openTabs };
     openTabs[`${tabId}`] = updatedTab;
 
@@ -89,8 +89,6 @@ const run = async () => {
     console.log(e.payload);
     console.groupEnd();
   });
-
-  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
   browser.tabs.onRemoved.addListener(async (tabId, { windowId }) => {
     if (windowId !== 1) return;

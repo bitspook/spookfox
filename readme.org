@@ -114,7 +114,7 @@ Following variables are available to configure some aspects of spookfox.
    browser tabs are saved.
 
    #+begin_src elisp
-     (setq spookfox-saved-tabs-target '(file+headline (expand-file-name "spookfox.org" org-directory)))
+     (setq spookfox-saved-tabs-target `(file+headline ,(expand-file-name "spookfox.org" org-directory) "Tabs"))
    #+end_src
 
 2. =spookfox-max-reconnect-retry-interval=
