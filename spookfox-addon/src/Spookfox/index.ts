@@ -103,21 +103,40 @@ export class Spookfox extends EventTarget {
   constructor(public port?: browser.runtime.Port) {
     super();
     if (!port) {
-      this.connect();
+      this.port = this.connect();
     }
+    this.init();
+  }
 
+  private init() {
     setupBroker(this);
-    this.setupRequestHandler();
-    this.setupResponseHandler();
-    this.initStateOnReconnect();
-    this.setupDisconnectHandler();
+    this.setupEventListeners();
+  }
+
+  private reInit() {
+    this.port = this.connect();
+    this.teardownEventListeners();
+    this.init();
+  }
+
+  private setupEventListeners() {
+    this.addEventListener(SFEvents.REQUEST, this.handleRequest);
+    this.addEventListener(SFEvents.RESPONSE, this.handleResponse);
+    this.addEventListener(SFEvents.EMACS_CONNECTED, this.handleConnected);
+    this.addEventListener(SFEvents.DISCONNECTED, this.handleDisconnected);
+  }
+
+  private teardownEventListeners() {
+    this.removeEventListener(SFEvents.REQUEST, this.handleRequest);
+    this.removeEventListener(SFEvents.RESPONSE, this.handleResponse);
+    this.removeEventListener(SFEvents.EMACS_CONNECTED, this.handleConnected);
+    this.removeEventListener(SFEvents.DISCONNECTED, this.handleDisconnected);
   }
 
   private connect() {
     if (this.port) this.port.disconnect();
 
-    this.port = browser.runtime.connectNative('spookfox');
-    return this.port;
+    return browser.runtime.connectNative('spookfox');
   }
 
   /**
@@ -128,7 +147,7 @@ export class Spookfox extends EventTarget {
    * const savedTabs = sf.request('GET_SAVED_TABS');
    * ```
    */
-  request(name: string, payload?: object) {
+  async request(name: string, payload?: object) {
     const request = {
       id: uuid(),
       name,
@@ -137,15 +156,30 @@ export class Spookfox extends EventTarget {
 
     this.port.postMessage(request);
 
-    return this.getResponse(request.id);
+    try {
+      const res = await this.getResponse(request.id);
+      return res;
+    } catch (err) {
+      // If the response times-out, it is quite likely #14 happening. Try to
+      // brush it-off by reinitializing spookfox
+      if (/timeout/.test(err.message.toLowerCase())) {
+        console.warn('Response timed out. Reinitializing Spookfox');
+        this.reInit();
+        this.port.postMessage(request);
+        return this.getResponse(request.id);
+      }
+
+      throw err;
+    }
   }
 
   /**
-   * A convenience function for dispatching new events to `Spookfox`.
+   * A convenience function for emitting new events to `Spookfox`.
    */
-  dispatch(name: string, payload?: object, msg?: string) {
+  emit(name: SFEvents, payload?: object, msg?: string) {
     this.dispatchEvent(new SFEvent(name, payload, msg));
   }
+
   /**
    * Run a function when Emacs makes a request.
    * # Example
@@ -181,51 +215,44 @@ export class Spookfox extends EventTarget {
    */
   newState(s: State, debugMsg?: string) {
     this.state = s;
-    this.dispatch(SFEvents.NEW_STATE, s, debugMsg);
+    this.emit(SFEvents.NEW_STATE, s, debugMsg);
   }
 
   /**
    * Handle `SFEvents.REQUEST` events.
-   * Calling this is critical for processing any requests received from Emacs.
    */
-  private setupRequestHandler = async () => {
-    this.addEventListener(SFEvents.REQUEST, async (e: SFEvent<Request>) => {
-      const request = e.payload;
-      const executioner = this.reqHandlers[request.name];
+  private handleRequest = async (e: SFEvent<Request>) => {
+    const request = e.payload;
+    const executioner = this.reqHandlers[request.name];
 
-      if (!executioner) {
-        console.warn(
-          `No handler for request [request=${JSON.stringify(request)}]`
-        );
-        return;
-      }
-      const response = await executioner(request.payload, this);
+    if (!executioner) {
+      console.warn(
+        `No handler for request [request=${JSON.stringify(request)}]`
+      );
+      return;
+    }
+    const response = await executioner(request.payload, this);
 
-      return this.port.postMessage({
-        requestId: request.id,
-        payload: response,
-      });
+    return this.port.postMessage({
+      requestId: request.id,
+      payload: response,
     });
   };
 
   /**
    * Handle `SFEvents.RESPONSE` events.
-   * Calling this is critical for getting responses for any requests sent to
-   * Emacs.
    */
-  private setupResponseHandler() {
-    this.addEventListener(SFEvents.RESPONSE, (e: SFEvent<Response>) => {
-      const res = e.payload;
+  private handleResponse(e: SFEvent<Response>) {
+    const res = e.payload;
 
-      if (!res.requestId) {
-        throw new Error(`Invalid response: [res=${res}]`);
-      }
+    if (!res.requestId) {
+      throw new Error(`Invalid response: [res=${res}]`);
+    }
 
-      // Dispatch a unique event per `requestId`. Shenanigans I opted for doing
-      // to build a promise based interface on request/response dance needed
-      // for communication with Emacs. Check `Spookfox.getResponse`
-      this.dispatch(res.requestId, res.payload);
-    });
+    // Emit a unique event per `requestId`. Shenanigans I opted for doing
+    // to build a promise based interface on request/response dance needed
+    // for communication with Emacs. Check `Spookfox.getResponse`
+    this.emit(res.requestId as SFEvents, res.payload);
   }
 
   private getResponse(requestId: string) {
@@ -250,54 +277,50 @@ export class Spookfox extends EventTarget {
   /**
    * Initialize `Spookfox.state` When Emacs first connects.
    */
-  private initStateOnReconnect() {
-    this.addEventListener(SFEvents.EMACS_CONNECTED, async () => {
-      const savedTabs = (await this.request('GET_SAVED_TABS')) as SFTab[];
-      const currentTabs = await browser.tabs.query({ windowId: 1 });
+  private async handleConnected() {
+    const savedTabs = (await this.request('GET_SAVED_TABS')) as SFTab[];
+    const currentTabs = await browser.tabs.query({ windowId: 1 });
 
-      // Problem: There might be tabs with same URLs
-      // Solution: First open tab in browser is mapped to first tab saved in Emacs.
-      // Catch: Every time this function runs, all current tabs which match urls
-      // saved in Emacs are mapped; regardless of whether user meant it or not.
-      const takenSavedTabIds = [];
-      const openTabs = currentTabs.reduce((accum, tab) => {
-        const savedTab = savedTabs.find(
-          (st) => st.url === tab.url && takenSavedTabIds.indexOf(st.id) === -1
-        );
-        if (savedTab) {
-          takenSavedTabIds.push(savedTab.id);
-          accum[tab.id] = {
-            savedTabId: savedTab.id,
-            ...tab,
-          };
-        } else {
-          accum[tab.id] = tab;
-        }
-
-        return accum;
-      }, {});
-
-      const savedTabsMap = savedTabs.reduce((accum, tab) => {
+    // Problem: There might be tabs with same URLs
+    // Solution: First open tab in browser is mapped to first tab saved in Emacs.
+    // Catch: Every time this function runs, all current tabs which match urls
+    // saved in Emacs are mapped; regardless of whether user meant it or not.
+    const takenSavedTabIds = [];
+    const openTabs = currentTabs.reduce((accum, tab) => {
+      const savedTab = savedTabs.find(
+        (st) => st.url === tab.url && takenSavedTabIds.indexOf(st.id) === -1
+      );
+      if (savedTab) {
+        takenSavedTabIds.push(savedTab.id);
+        accum[tab.id] = {
+          savedTabId: savedTab.id,
+          ...tab,
+        };
+      } else {
         accum[tab.id] = tab;
-        return accum;
-      }, {});
+      }
 
-      const newState = {
-        ...this.state,
-        openTabs,
-        savedTabs: savedTabsMap,
-      };
+      return accum;
+    }, {});
 
-      this.newState(newState, 'INITIAL_STATE');
-    });
+    const savedTabsMap = savedTabs.reduce((accum, tab) => {
+      accum[tab.id] = tab;
+      return accum;
+    }, {});
+
+    const newState = {
+      ...this.state,
+      openTabs,
+      savedTabs: savedTabsMap,
+    };
+
+    this.newState(newState, 'INITIAL_STATE');
   }
 
   /**
    * Handle disconnection from spookfox.
    */
-  private setupDisconnectHandler() {
-    this.addEventListener(SFEvents.DISCONNECTED, (err) => {
-      console.warn('Spookfox disconnected. [err=', err, ']');
-    });
+  private handleDisconnected(err?: SFEvent) {
+    console.warn('Spookfox disconnected. [err=', err, ']');
   }
 }

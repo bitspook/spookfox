@@ -17,7 +17,7 @@ export default (sf: Spookfox) => {
    * Inform `Spookfox` when browser disconnects from spookfox-native for any reason.
    */
   sf.port.onDisconnect.addListener((p) => {
-    sf.dispatch(SFEvents.DISCONNECTED, { error: p.error });
+    sf.emit(SFEvents.DISCONNECTED, { error: p.error });
   });
 
   sf.port.onMessage.addListener(async (pkt: Packet) => {
@@ -37,14 +37,14 @@ export default (sf: Spookfox) => {
       // Handle this event as a special case to provide a uniform interface through
       // `Spookfox`.
       if (msg.name === 'CONNECTED') {
-        return sf.dispatch(SFEvents.EMACS_CONNECTED);
+        return sf.emit(SFEvents.EMACS_CONNECTED);
       }
 
       if (msg.name) {
-        return sf.dispatch(SFEvents.REQUEST, msg);
+        return sf.emit(SFEvents.REQUEST, msg);
       }
 
-      return sf.dispatch(SFEvents.RESPONSE, msg);
+      return sf.emit(SFEvents.RESPONSE, msg);
     } catch (err) {
       console.error(`Bad message payload [err=${err}, msg=${pkt.message}]`);
     }
