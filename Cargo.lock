@@ -83,7 +83,7 @@ dependencies = [
 
 [[package]]
 name = "spookfox-native"
-version = "0.1.0"
+version = "0.1.10"
 dependencies = [
  "chrome_native_messaging",
  "serde",

@@ -99,12 +99,14 @@ export class Spookfox extends EventTarget {
     savingTabs: [],
   };
   reqHandlers = {};
+  debug: boolean;
 
-  constructor(public port?: browser.runtime.Port) {
+  constructor(public port?: browser.runtime.Port, public windowId = 1) {
     super();
     if (!port) {
       this.port = this.connect();
     }
+    this.debug = Boolean(localStorage.getItem('SPOOKFOX_DEBUG'));
     this.init();
   }
 
@@ -265,12 +267,15 @@ export class Spookfox extends EventTarget {
 
         resolve(event.payload);
       };
+      this.addEventListener(requestId, listener);
+
+      // If it's taking too long to for Emacs to respond, something bad has
+      // probably happened and we aren't getting any response. Time to abort the
+      // response.
       const killTimer = setTimeout(() => {
         this.removeEventListener(requestId, listener);
         reject(new Error('Spookfox response timeout.'));
       }, maxWait);
-
-      this.addEventListener(requestId, listener);
     });
   }
 
@@ -279,7 +284,7 @@ export class Spookfox extends EventTarget {
    */
   private async handleConnected() {
     const savedTabs = (await this.request('GET_SAVED_TABS')) as SFTab[];
-    const currentTabs = await browser.tabs.query({ windowId: 1 });
+    const currentTabs = await browser.tabs.query({ windowId: this.windowId });
 
     // Problem: There might be tabs with same URLs
     // Solution: First open tab in browser is mapped to first tab saved in Emacs.
@@ -308,13 +313,13 @@ export class Spookfox extends EventTarget {
       return accum;
     }, {});
 
-    const newState = {
+    const initialState = {
       ...this.state,
       openTabs,
       savedTabs: savedTabsMap,
     };
 
-    this.newState(newState, 'INITIAL_STATE');
+    this.dispatch(Actions.INITIAL_STATE, initialState);
   }
 
   /**
@@ -323,4 +328,116 @@ export class Spookfox extends EventTarget {
   private handleDisconnected(err?: SFEvent) {
     console.warn('Spookfox disconnected. [err=', err, ']');
   }
+
+  private rootReducer({ name, payload }: Action, state: State): State {
+    if (this.debug) {
+      console.groupCollapsed(name);
+      console.log('Payload', payload);
+    }
+
+    let nextState = state;
+    switch (name) {
+      case Actions.INITIAL_STATE:
+        nextState = payload;
+        break;
+
+      case Actions.SAVE_TAB_START:
+        nextState = {
+          ...state,
+          savingTabs: [...state.savingTabs, payload],
+        };
+        break;
+
+      case Actions.SAVE_TAB_SUCCESS:
+        nextState = {
+          ...state,
+          savedTabs: {
+            ...state.savedTabs,
+            [payload.savedTab.id]: payload.savedTab,
+          },
+          openTabs: {
+            ...state.openTabs,
+            [payload.openedTab.id.toString()]: {
+              ...payload.openedTab,
+              savedTabId: payload.savedTab.id,
+            },
+          },
+          savingTabs: state.savingTabs.filter(
+            (id) => id !== payload.openedTab.id
+          ),
+        };
+        break;
+
+      case Actions.UPDATE_TAB_START:
+        nextState = {
+          ...state,
+          openTabs: {
+            ...state.openTabs,
+            [payload.tabId]: {
+              ...state.openTabs[payload.tabId],
+              ...payload.patch,
+            },
+          },
+        };
+        break;
+
+      case Actions.UPDATE_TAB_SUCCESS:
+        nextState = {
+          ...state,
+          savedTabs: {
+            ...state.savedTabs,
+            [payload.id]: payload,
+          },
+        };
+        break;
+
+      case Actions.REMOVE_TAB_SUCCESS: {
+        const savedTabs = { ...state.savedTabs };
+        const openTabs = { ...state.openTabs };
+        delete openTabs[
+          Object.values(openTabs).find((tab) => tab.savedTabId === payload.id)
+            ?.id
+        ];
+        delete savedTabs[payload.id];
+        nextState = {
+          ...state,
+          savedTabs,
+          openTabs,
+        };
+        break;
+      }
+    }
+
+    console.log('Next state', nextState);
+    console.groupEnd();
+
+    return nextState;
+  }
+
+  dispatch(name: Actions, payload: any) {
+    const newState = this.rootReducer({ name, payload }, this.state);
+    this.newState(newState);
+  }
+}
+
+export enum Actions {
+  INITIAL_STATE = 'INITIAL_STATE',
+  SAVE_TAB_START = 'SAVE_TAB_INIT',
+  SAVE_TAB_SUCCESS = 'SAVE_TAB_SUCCESS',
+  SAVE_TAB_FAIL = 'SAVE_TAB_FAIL',
+  UPDATE_TAB_START = 'UPDATE_TAB_START',
+  UPDATE_TAB_SUCCESS = 'UPDATE_TAB_SUCCESS',
+  UPDATE_TAB_FAIL = 'UPDATE_TAB_FAIL',
+  REMOVE_TAB_START = 'REMOVE_TAB_START',
+  REMOVE_TAB_SUCCESS = 'REMOVE_TAB_SUCCESS',
+  REMOVE_TAB_FAIL = 'REMOVE_TAB_FAIL',
+}
+
+export enum EmacsRequests {
+  TOGGLE_TAB_CHAINING = 'TOGGLE_TAB_CHAINING',
+}
+
+interface Action {
+  name: Actions;
+  payload?: any;
 }

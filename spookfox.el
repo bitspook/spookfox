@@ -292,19 +292,22 @@ PATCH is a plist of properties to upsert."
              ("TITLE" (org-edit-headline (if (sf--string-banlk-p val) "<empty-title>" val)))
              ("TAGS" (org-set-tags val))
              (_ (org-entry-put (point) prop val)))))
-       (save-buffer)))))
+       (save-buffer))))
+  (sf--find-tab-with-id tab-id))
 
 (defun sf--remove-tab (tab-id)
   "Remove tab with TAB-ID."
-  (sf--with-tabs-subtree
-   (let ((pos (org-id-find-id-in-file tab-id (buffer-file-name))))
-     (when pos
-       (goto-char (cdr pos))
-       (org-narrow-to-subtree)
-       (delete-region (point-min) (point-max))
-       (widen)
-       (delete-line)
-       (save-buffer)))))
+  (let ((tab (sf--find-tab-with-id tab-id)))
+    (sf--with-tabs-subtree
+     (let ((pos (org-id-find-id-in-file tab-id (buffer-file-name))))
+       (when pos
+         (goto-char (cdr pos))
+         (org-narrow-to-subtree)
+         (delete-region (point-min) (point-max))
+         (widen)
+         (delete-line)
+         (save-buffer))))
+    tab))
 
 (defun sf--tab-read ()
   "Ask user to select a tab using Emacs' completion system."
@@ -369,7 +372,7 @@ Return value of HANDLER is sent back to browser as response."
   (let* ((chained? (not (plist-get tab :chained)))
          (tab-id (plist-get tab :id)))
     (if tab-id
-        (sf--handle-update-tab (plist-put tab :chained chained?))
+        (sf--handle-update-tab `(:id ,tab-id :patch (:chained ,chained?)))
       (setq tab-id (sf--with-tabs-subtree
                     (goto-char (point-max))
                     (sf--insert-tab (plist-put tab :chained chained?)))))
@@ -386,16 +389,17 @@ Return value of HANDLER is sent back to browser as response."
   "Handler for REMOVE_TAB action."
   (sf--remove-tab (plist-get tab :id)))
 
-(defun sf--handle-update-tab (tab)
-  "Handler for UPDATE_TAB action."
+(defun sf--handle-update-tab (payload)
+  "Handler for UPDATE_TAB action.
+PAYLOAD is a plist with :id and :patch"
   (sf--update-tab
-   (plist-get tab :id)
+   (plist-get payload :id)
    (mapcar
     (lambda (x)
       (cond
        ((eq x nil) "nil")
        ((eq x t) "t")
-       (t x))) tab)))
+       (t x))) (plist-get payload :patch))))
 
 (sf--register-req-handler "TOGGLE_TAB_CHAINING" #'sf--handle-toggle-tab-chaining)
 (sf--register-req-handler "GET_SAVED_TABS" #'sf--handle-get-saved-tabs)

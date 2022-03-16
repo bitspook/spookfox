@@ -1,5 +1,12 @@
 import { sleep } from './lib';
-import { Spookfox, SFEvent, SFEvents, State } from './Spookfox';
+import {
+  Spookfox,
+  SFEvent,
+  SFEvents,
+  State,
+  Actions,
+  EmacsRequests,
+} from './Spookfox';
 import {
   SFTab,
   fromBrowserTab,
@@ -19,41 +26,27 @@ const searchFor = async (p: string) => {
 const run = async () => {
   const sf = ((window as any).sf = new Spookfox());
 
-  browser.tabs.onCreated.addListener(async (tab) => {
-    sf.newState(
-      {
-        ...sf.state,
-        openTabs: { ...sf.state.openTabs, [`${tab.id}`]: tab },
-        savingTabs: sf.state.savingTabs.concat([tab.id]),
-      },
-      `SAVING_TAB ${tab.id}`
-    );
+  browser.tabs.onCreated.addListener(async (openedTab) => {
+    sf.dispatch(Actions.SAVE_TAB_START, openedTab.id);
 
-    const savedTab = (await sf.request(
-      'TOGGLE_TAB_CHAINING',
-      fromBrowserTab(tab)
-    )) as SFTab;
-    const savedTabs = { ...sf.state.savedTabs };
-    const openTabs = { ...sf.state.openTabs };
-    savedTabs[savedTab.id] = savedTab;
-    openTabs[`${tab.id}`] = { ...tab, savedTabId: savedTab.id };
+    try {
+      const savedTab = (await sf.request(
+        EmacsRequests.TOGGLE_TAB_CHAINING,
+        fromBrowserTab(openedTab)
+      )) as SFTab;
 
-    sf.newState(
-      {
-        ...sf.state,
-        savingTabs: sf.state.savingTabs.filter((id) => id !== tab.id),
-        savedTabs,
-        openTabs,
-      },
-      `SAVED_TAB ${tab.id}`
-    );
+      sf.dispatch(Actions.SAVE_TAB_SUCCESS, { savedTab, openedTab: openedTab });
+    } catch (error) {
+      console.error('Failed TOGGLE_TAB_CHAINING [err=', error, ']');
+      sf.dispatch(Actions.SAVE_TAB_FAIL, { openedTab, error });
+    }
   });
 
-  browser.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
+  browser.tabs.onUpdated.addListener(async (tabId, patch) => {
     // We aren't interested in all the tab changes (e.g which tab is active).
     // Here is a list of properties which we care about
     const desiredProps = ['url', 'title'];
-    const changedDesiredProps = Object.keys(changeInfo).filter((k) =>
+    const changedDesiredProps = Object.keys(patch).filter((k) =>
       desiredProps.includes(k)
     );
     if (!changedDesiredProps.length) {
@@ -62,48 +55,47 @@ const run = async () => {
 
     const tab = sf.state.openTabs[`${tabId}`];
     const savedTab = sf.state.savedTabs[tab.savedTabId];
-    const updatedTab = { ...tab, ...changeInfo };
+
+    sf.dispatch(Actions.UPDATE_TAB_START, { tabId, patch });
 
     if (savedTab?.chained) {
-      sf.request(
-        'UPDATE_TAB',
-        // augment with savedTab for Emacs side properties like 'chained'
-        fromBrowserTab({ ...savedTab, ...updatedTab } as OpenTab)
-      ).catch((err) => {
-        console.warn(
-          `Error during updating tabs. [tabId=${tabId}, err=${err}]`
+      try {
+        const updatedTab = await sf.request('UPDATE_TAB', {
+          id: savedTab.id,
+          patch,
+        });
+        sf.dispatch(Actions.UPDATE_TAB_SUCCESS, updatedTab);
+      } catch (error) {
+        console.error(
+          `Error during updating tabs. [tabId=${tabId}, error=${error}]`
         );
-      });
+        sf.dispatch(Actions.UPDATE_TAB_FAIL, { error, tabId });
+      }
     }
-
-    const openTabs = { ...sf.state.openTabs };
-    openTabs[`${tabId}`] = updatedTab;
-
-    sf.newState({ ...sf.state, openTabs }, `UPDATED_TAB ${tabId}`);
-  });
-
-  // For debugging state transitions
-  sf.addEventListener(SFEvents.NEW_STATE, (e: SFEvent) => {
-    if (!localStorage.getItem('DEBUG_NEW_STATE')) return;
-    console.groupCollapsed(`${e.name} ${e.debugMessage || ''}`);
-    console.log(e.payload);
-    console.groupEnd();
   });
 
   browser.tabs.onRemoved.addListener(async (tabId, { windowId }) => {
     if (windowId !== 1) return;
     if (sf.state.savingTabs.includes(tabId)) await sleep(600);
 
-    const tab = sf.state.openTabs[`${tabId}`];
-    const savedTab = sf.state.savedTabs[tab.savedTabId];
+    const openedTab = sf.state.openTabs[`${tabId}`];
+    const savedTab = sf.state.savedTabs[openedTab.savedTabId];
+    sf.dispatch(Actions.REMOVE_TAB_START, { tabId });
 
     if (savedTab?.chained) {
-      await sf.request('REMOVE_TAB', fromBrowserTab(tab));
+      try {
+        const removedTab = await sf.request(
+          'REMOVE_TAB',
+          fromBrowserTab(openedTab)
+        );
+        sf.dispatch(Actions.REMOVE_TAB_SUCCESS, removedTab);
+      } catch (error) {
+        console.error(
+          `Error during removing tab. [tabId=${tabId}, error=${error}]`
+        );
+        sf.dispatch(Actions.REMOVE_TAB_FAIL, { tabId, error });
+      }
     }
-    const openTabs = { ...sf.state.openTabs };
-    delete openTabs[`${tabId}`];
-
-    sf.newState({ ...sf.state, openTabs }, `REMOVED_TAB ${tabId}`);
   });
 
   // Ensure page-action icons (chained icon) for all tabs are always correct
@@ -142,21 +134,23 @@ const run = async () => {
 
   browser.pageAction.onClicked.addListener(async (t) => {
     const state = { ...sf.state };
-    const tab = state.openTabs[t.id];
-    const localSavedTab = state.savedTabs[tab.savedTabId] || {};
+    const openedTab = state.openTabs[t.id];
+    const localSavedTab = state.savedTabs[openedTab.savedTabId] || {};
+    sf.dispatch(Actions.SAVE_TAB_START, openedTab.id);
 
-    const savedTab = (await sf.request(
-      'TOGGLE_TAB_CHAINING',
-      fromBrowserTab({
-        ...localSavedTab,
-        ...tab,
-      })
-    )) as SFTab;
-
-    state.openTabs[`${tab.id}`].savedTabId = savedTab.id;
-    state.savedTabs[savedTab.id] = savedTab;
-
-    sf.newState(state, 'CLICKED_PAGE_ACTION');
+    try {
+      const savedTab = (await sf.request(
+        'TOGGLE_TAB_CHAINING',
+        fromBrowserTab({
+          ...localSavedTab,
+          ...openedTab,
+        })
+      )) as SFTab;
+      sf.dispatch(Actions.SAVE_TAB_SUCCESS, { savedTab, openedTab });
+    } catch (error) {
+      console.error(`Error during page-action. [err=${error}]`);
+      sf.dispatch(Actions.SAVE_TAB_FAIL, { openedTab, error });
+    }
   });
 
   sf.registerReqHandler('GET_ACTIVE_TAB', getActiveTab);
