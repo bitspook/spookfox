@@ -1,6 +1,6 @@
 {
   "name": "spookfox",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "license": "GPLv3",
   "scripts": {
     "start": "parcel serve src/manifest.json",
