@@ -1,4 +1,4 @@
-import { Spookfox } from './Spookfox';
+import { Actions, Spookfox } from './Spookfox';
 
 /**
  * A tab saved in Emacs.
@@ -84,27 +84,17 @@ export const openTab = async (
     if (tab) {
       try {
         await browser.tabs.update(tab.id, { active: true });
+        return null;
       } catch (err) {
         if (/invalid tab id/.test(err.message.toLowerCase())) {
-          const openTabs = { ...sf.state.openTabs };
-          delete openTabs[`${tab.id}`];
-          sf.newState(
-            { ...sf.state, openTabs },
-            `OPEN_SAVED_TAB [id=${p.id}, url=${p.url}]`
-          );
+          sf.dispatch(Actions.REMOVE_TAB_START, { tabId: tab.id });
+        } else {
+          console.error('Error while opening-tab', { payload: p, err });
         }
       }
-
-      return null;
-    } else {
-      // FIXME
-      // A hackish way to ensure we don't create duplicate entries in org file
-      // when a tab is opened from Emacs. Ideally, we should keep the original
-      // entry and not create a new entry at all; but since we listen to
-      // browser.tabs.onCreated event, as soon as we create a new tab, it is
-      // saved in org-file.
-      await sf.request('REMOVE_TAB', { id: p.id });
     }
+
+    sf.dispatch(Actions.REOPEN_TAB, p);
   }
 
   const tab = await browser.tabs.create({ url: p.url });

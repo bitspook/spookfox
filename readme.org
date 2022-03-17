@@ -134,3 +134,7 @@ Following variables are available to configure some aspects of spookfox.
 
    This is the directory in which spookfox will download and save
    spookfox-native binary (from the [[https://github.com/bitspook/spookfox/releases/][releases page]]).
+
+** Contribute
+
+Please read the [[./contributing.org][contributing.org]] document.

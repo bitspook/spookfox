@@ -1,3 +1,7 @@
+#+begin_quote
+You might also wanna read [[./architecture.org]]
+#+end_quote
+
 If you are looking to contribute to spookfox's development, please follow this
 guide to setup a development environment. I am going to assume you are on a
 Linux machine, and have cloned this repo.

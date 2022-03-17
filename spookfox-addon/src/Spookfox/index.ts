@@ -38,6 +38,11 @@ export interface State {
   // from Emacs. To resolve this, we need a `savingTabs` which keeps track if
   // tabs which are under-process of being saved.
   savingTabs: number[];
+  // Let's maintain a list of tab we are reopening, so the 'new tab' handler
+  // knows whether to instruct Emacs to create a new org entry, or update an
+  // existing one
+  // Please read 'Reopening a saved tab' flow in architecture doc
+  reOpeningTabs: Array<{ id: string; url: string }>;
 }
 
 /**
@@ -97,6 +102,7 @@ export class Spookfox extends EventTarget {
     openTabs: {},
     savedTabs: {},
     savingTabs: [],
+    reOpeningTabs: [],
   };
   reqHandlers = {};
   debug: boolean;
@@ -170,8 +176,6 @@ export class Spookfox extends EventTarget {
         this.port.postMessage(request);
         return this.getResponse(request.id);
       }
-
-      throw err;
     }
   }
 
@@ -365,6 +369,9 @@ export class Spookfox extends EventTarget {
           savingTabs: state.savingTabs.filter(
             (id) => id !== payload.openedTab.id
           ),
+          reOpeningTabs: state.reOpeningTabs.filter(
+            ({ id }) => id !== payload.savedTab.id
+          ),
         };
         break;
 
@@ -391,21 +398,33 @@ export class Spookfox extends EventTarget {
         };
         break;
 
+      case Actions.REMOVE_TAB_START: {
+        const openTabs = { ...state.openTabs };
+        delete openTabs[payload.tabId];
+
+        nextState = {
+          ...state,
+          openTabs,
+          savingTabs: state.savingTabs.filter((tId) => tId !== payload.tabId),
+        };
+        break;
+      }
+
       case Actions.REMOVE_TAB_SUCCESS: {
         const savedTabs = { ...state.savedTabs };
-        const openTabs = { ...state.openTabs };
-        delete openTabs[
-          Object.values(openTabs).find((tab) => tab.savedTabId === payload.id)
-            ?.id
-        ];
         delete savedTabs[payload.id];
         nextState = {
           ...state,
           savedTabs,
-          openTabs,
         };
         break;
       }
+
+      case Actions.REOPEN_TAB:
+        nextState = {
+          ...state,
+          reOpeningTabs: [...state.reOpeningTabs, payload],
+        };
     }
 
     console.log('Next state', nextState);
@@ -415,14 +434,20 @@ export class Spookfox extends EventTarget {
   }
 
   dispatch(name: Actions, payload: any) {
-    const newState = this.rootReducer({ name, payload }, this.state);
-    this.newState(newState);
+    // Need to manually do the error handling here because Firefox is eating
+    // these errors up and not showing them in addon's console
+    try {
+      const newState = this.rootReducer({ name, payload }, this.state);
+      this.newState(newState);
+    } catch (err) {
+      console.error('Error during dispatching action, [err=', err, ']');
+    }
   }
 }
 
 export enum Actions {
   INITIAL_STATE = 'INITIAL_STATE',
-  SAVE_TAB_START = 'SAVE_TAB_INIT',
+  SAVE_TAB_START = 'SAVE_TAB_START',
   SAVE_TAB_SUCCESS = 'SAVE_TAB_SUCCESS',
   SAVE_TAB_FAIL = 'SAVE_TAB_FAIL',
   UPDATE_TAB_START = 'UPDATE_TAB_START',
@@ -431,6 +456,7 @@ export enum Actions {
   REMOVE_TAB_START = 'REMOVE_TAB_START',
   REMOVE_TAB_SUCCESS = 'REMOVE_TAB_SUCCESS',
   REMOVE_TAB_FAIL = 'REMOVE_TAB_FAIL',
+  REOPEN_TAB = 'REOPEN_TAB',
 }
 
 export enum EmacsRequests {

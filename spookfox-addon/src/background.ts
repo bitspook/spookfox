@@ -14,7 +14,6 @@ import {
   getAllTabs,
   openTab,
   openTabs,
-  OpenTab,
 } from './tabs';
 
 const searchFor = async (p: string) => {
@@ -29,13 +28,23 @@ const run = async () => {
   browser.tabs.onCreated.addListener(async (openedTab) => {
     sf.dispatch(Actions.SAVE_TAB_START, openedTab.id);
 
+    // This might be one of the places where browser compatibility is an issue
+    // Please read 'Reopening a saved tab' flow in architecture doc
+    const reOpeningTab = sf.state.reOpeningTabs.find(
+      ({ url }) =>
+        url.includes(openedTab.title) && openedTab.url === 'about:blank'
+    );
+    if (reOpeningTab) {
+      return;
+    }
+
     try {
       const savedTab = (await sf.request(
         EmacsRequests.TOGGLE_TAB_CHAINING,
         fromBrowserTab(openedTab)
       )) as SFTab;
 
-      sf.dispatch(Actions.SAVE_TAB_SUCCESS, { savedTab, openedTab: openedTab });
+      sf.dispatch(Actions.SAVE_TAB_SUCCESS, { savedTab, openedTab });
     } catch (error) {
       console.error('Failed TOGGLE_TAB_CHAINING [err=', error, ']');
       sf.dispatch(Actions.SAVE_TAB_FAIL, { openedTab, error });
@@ -43,6 +52,17 @@ const run = async () => {
   });
 
   browser.tabs.onUpdated.addListener(async (tabId, patch) => {
+    // This might be one of the places where browser compatibility is an issue
+    // Please read 'Reopening a saved tab' flow in architecture doc
+    const reOpeningTab = sf.state.reOpeningTabs.find(
+      ({ url }) => url === patch.url
+    );
+    if (reOpeningTab) {
+      const openedTab = await browser.tabs.get(tabId);
+      const savedTab = sf.state.savedTabs[reOpeningTab.id];
+      sf.dispatch(Actions.SAVE_TAB_SUCCESS, { savedTab, openedTab });
+    }
+
     // We aren't interested in all the tab changes (e.g which tab is active).
     // Here is a list of properties which we care about
     const desiredProps = ['url', 'title'];
@@ -62,7 +82,12 @@ const run = async () => {
       try {
         const updatedTab = await sf.request('UPDATE_TAB', {
           id: savedTab.id,
-          patch,
+          patch: desiredProps.reduce((accum, prop) => {
+            // Make sure we aren't sending unnecessary props to Emacs (e.g
+            // patch.status)
+            if (patch[prop]) accum[prop] = patch[prop];
+            return accum;
+          }, {}),
         });
         sf.dispatch(Actions.UPDATE_TAB_SUCCESS, updatedTab);
       } catch (error) {
@@ -78,16 +103,14 @@ const run = async () => {
     if (windowId !== 1) return;
     if (sf.state.savingTabs.includes(tabId)) await sleep(600);
 
-    const openedTab = sf.state.openTabs[`${tabId}`];
-    const savedTab = sf.state.savedTabs[openedTab.savedTabId];
+    const savedTabId = sf.state.openTabs[`${tabId}`].savedTabId;
     sf.dispatch(Actions.REMOVE_TAB_START, { tabId });
+
+    const savedTab = sf.state.savedTabs[savedTabId];
 
     if (savedTab?.chained) {
       try {
-        const removedTab = await sf.request(
-          'REMOVE_TAB',
-          fromBrowserTab(openedTab)
-        );
+        const removedTab = await sf.request('REMOVE_TAB', { id: savedTabId });
         sf.dispatch(Actions.REMOVE_TAB_SUCCESS, removedTab);
       } catch (error) {
         console.error(
