@@ -1,6 +1,6 @@
-import { freeze, Immutable } from 'immer';
+import { Draft, freeze, Immutable } from 'immer';
 import { SFApp, SFEvents, Spookfox } from '~src/Spookfox';
-import { sleep } from '~src/lib';
+import { gobbleErrorsOf, sleep } from '~src/lib';
 
 export type OrgTabsState = Immutable<{
   // All the tabs open in browser at any time. Assumption is that this list is
@@ -97,16 +97,31 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
     this.name = name;
     this.sf = sf;
 
-    sf.addEventListener(SFEvents.EMACS_CONNECTED, this.handleConnected);
-    browser.tabs.onCreated.addListener(this.handleNewTab);
-    browser.tabs.onUpdated.addListener(this.handleUpdateTab);
-    browser.tabs.onRemoved.addListener(this.handleRemoveTab);
+    sf.addEventListener(
+      SFEvents.EMACS_CONNECTED,
+      gobbleErrorsOf(this.handleConnected)
+    );
+    browser.tabs.onCreated.addListener(gobbleErrorsOf(this.handleNewTab));
+    browser.tabs.onUpdated.addListener(gobbleErrorsOf(this.handleUpdateTab));
+    browser.tabs.onRemoved.addListener(gobbleErrorsOf(this.handleRemoveTab));
 
-    sf.registerReqHandler(EmacsRequests.GET_ACTIVE_TAB, this.getActiveTab);
-    sf.registerReqHandler(EmacsRequests.GET_ALL_TABS, this.getAllTabs);
-    sf.registerReqHandler(EmacsRequests.OPEN_TAB, this.openTab);
-    sf.registerReqHandler(EmacsRequests.OPEN_TABS, this.openTabs);
-    sf.registerReqHandler(EmacsRequests.SEARCH_FOR, this.openSearchTab);
+    sf.registerReqHandler(
+      EmacsRequests.GET_ACTIVE_TAB,
+      gobbleErrorsOf(this.getActiveTab)
+    );
+    sf.registerReqHandler(
+      EmacsRequests.GET_ALL_TABS,
+      gobbleErrorsOf(this.getAllTabs)
+    );
+    sf.registerReqHandler(EmacsRequests.OPEN_TAB, gobbleErrorsOf(this.openTab));
+    sf.registerReqHandler(
+      EmacsRequests.OPEN_TABS,
+      gobbleErrorsOf(this.openTabs)
+    );
+    sf.registerReqHandler(
+      EmacsRequests.SEARCH_FOR,
+      gobbleErrorsOf(this.openSearchTab)
+    );
   }
 
   /**
@@ -145,13 +160,7 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
     return tabs.map(fromBrowserTab);
   };
 
-  openTab = async (
-    p: {
-      id?: string;
-      url: string;
-    },
-    sf: Spookfox
-  ): Promise<SavedTab> => {
+  openTab = async (p: { id?: string; url: string }): Promise<SavedTab> => {
     if (p.id) {
       const tab = Object.values(this.state.openTabs).find(
         (t) => t?.savedTabId === p.id
@@ -163,14 +172,16 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
           return null;
         } catch (err) {
           if (/invalid tab id/.test(err.message.toLowerCase())) {
-            sf.dispatch(Actions.REMOVE_TAB_START, { tabId: tab.browserTabId });
+            this.dispatch(Actions.REMOVE_TAB_START, {
+              tabId: tab.browserTabId,
+            });
           } else {
             console.error('Error while opening-tab', { payload: p, err });
           }
         }
       }
 
-      sf.dispatch(Actions.REOPEN_TAB, p);
+      this.dispatch(Actions.REOPEN_TAB, p);
     }
 
     const tab = await browser.tabs.create({ url: p.url });
@@ -182,22 +193,20 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
     tabs: {
       id: string;
       url: string;
-    }[],
-    sf: Spookfox
+    }[]
   ): Promise<SavedTab[]> => {
-    const openedTabs = await Promise.all(tabs.map((t) => this.openTab(t, sf)));
+    const openedTabs = await Promise.all(tabs.map(this.openTab));
 
     return openedTabs;
   };
 
-  private handleNewTab = async (openedTab: browser.tabs.Tab) => {
-    this.dispatch(Actions.SAVE_TAB_START, openedTab.id);
+  private handleNewTab = async (tab: browser.tabs.Tab) => {
+    this.dispatch(Actions.SAVE_TAB_START, tab.id);
 
     // This might be one of the places where browser compatibility is an issue
     // Please read 'Reopening a saved tab' flow in architecture doc
-    const reOpeningTab = this.initialState.reOpeningTabs.find(
-      ({ url }) =>
-        url.includes(openedTab.title) && openedTab.url === 'about:blank'
+    const reOpeningTab = this.state.reOpeningTabs.find(
+      ({ url }) => url.includes(tab.title) && tab.url === 'about:blank'
     );
     if (reOpeningTab) {
       return;
@@ -206,13 +215,17 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
     try {
       const savedTab = (await this.sf.request(
         EmacsRequests.TOGGLE_TAB_CHAINING,
-        fromBrowserTab(openedTab)
+        fromBrowserTab(tab)
       )) as SavedTab;
+      const openedTab: OpenTab = {
+        browserTabId: tab.id,
+        savedTabId: savedTab.id,
+      };
 
       this.dispatch(Actions.SAVE_TAB_SUCCESS, { savedTab, openedTab });
     } catch (error) {
       console.error('Failed TOGGLE_TAB_CHAINING [err=', error, ']');
-      this.dispatch(Actions.SAVE_TAB_FAIL, { openedTab, error });
+      this.dispatch(Actions.SAVE_TAB_FAIL, { tab, error });
     }
   };
 
@@ -235,8 +248,12 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
       ({ url }) => url === patch.url
     );
     if (reOpeningTab) {
-      const openedTab = await browser.tabs.get(tabId);
+      const tab = await browser.tabs.get(tabId);
       const savedTab = this.state.savedTabs[reOpeningTab.id];
+      const openedTab: OpenTab = {
+        browserTabId: tab.id,
+        savedTabId: savedTab?.id,
+      };
       this.dispatch(Actions.SAVE_TAB_SUCCESS, { savedTab, openedTab });
     }
 
@@ -250,8 +267,8 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
       return;
     }
 
-    const tab = this.state.openTabs[`${tabId}`];
-    const savedTab = this.state.savedTabs[tab.savedTabId];
+    const openedTab = this.state.openTabs[`${tabId}`];
+    const savedTab = this.state.savedTabs[openedTab?.savedTabId];
 
     this.dispatch(Actions.UPDATE_TAB_START, { tabId, patch });
 
@@ -273,6 +290,8 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
         );
         this.dispatch(Actions.UPDATE_TAB_FAIL, { error, tabId });
       }
+    } else {
+      this.dispatch(Actions.UPDATE_TAB_SUCCESS, undefined);
     }
   };
 
@@ -280,7 +299,7 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
     if (windowId !== 1) return;
     if (this.state.savingTabs.includes(tabId)) await sleep(600);
 
-    const savedTabId = this.state.openTabs[`${tabId}`].savedTabId;
+    const savedTabId = this.state.openTabs[`${tabId}`]?.savedTabId;
     this.dispatch(Actions.REMOVE_TAB_START, { tabId });
 
     const savedTab = this.state.savedTabs[savedTabId];
@@ -326,6 +345,7 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
         openTab.chained = savedTab.chained;
       }
 
+      accum[tab.id] = openTab;
       return accum;
     }, {} as { [id: string]: OpenTab });
 
@@ -334,109 +354,70 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
       return accum;
     }, {});
 
-    const initialState = {
-      ...this.initialState,
+    this.dispatch(Actions.EMACS_RECONNECTED, {
       openTabs,
       savedTabs: savedTabsMap,
-    };
-
-    this.dispatch(Actions.INITIAL_STATE, initialState);
+    });
   };
 
-  reducer({ name, payload }, state: OrgTabsState) {
-    let nextState = state;
+  reducer({ name, payload }, state: Draft<OrgTabsState>) {
     switch (name) {
-      case Actions.INITIAL_STATE:
-        return payload;
+      case Actions.EMACS_RECONNECTED: {
+        state.openTabs = payload.openTabs;
+        state.savedTabs = payload.savedTabs;
+        break;
+      }
 
       case Actions.SAVE_TAB_START:
-        nextState = {
-          ...state,
-          savingTabs: [...state.savingTabs, payload],
-        };
+        state.savingTabs.push(payload);
         break;
 
-      case Actions.SAVE_TAB_SUCCESS:
-        nextState = {
-          ...state,
-          savedTabs: {
-            ...state.savedTabs,
-            [payload.savedTab.id]: payload.savedTab,
-          },
-          openTabs: {
-            ...state.openTabs,
-            [payload.openedTab.id.toString()]: {
-              ...payload.openedTab,
-              savedTabId: payload.savedTab.id,
-            },
-          },
-          savingTabs: state.savingTabs.filter(
-            (id) => id !== payload.openedTab.id
-          ),
-          reOpeningTabs: state.reOpeningTabs.filter(
-            ({ id }) => id !== payload.savedTab.id
-          ),
-        };
+      case Actions.SAVE_TAB_SUCCESS: {
+        state.savedTabs[payload.savedTab.id] = payload.savedTab;
+        state.openTabs[payload.openedTab.browserTabId] = payload.openedTab;
+        state.savingTabs = state.savingTabs.filter(
+          (id) => id !== payload.openedTab.id
+        );
+        state.reOpeningTabs = state.reOpeningTabs.filter(
+          ({ id }) => id !== payload.savedTab.id
+        );
         break;
+      }
 
       case Actions.UPDATE_TAB_START:
-        nextState = {
-          ...state,
-          openTabs: {
-            ...state.openTabs,
-            [payload.tabId]: {
-              ...state.openTabs[payload.tabId],
-              ...payload.patch,
-            },
-          },
+        state.openTabs[payload.tabId] = {
+          ...state.openTabs[`${payload.tabId}`],
+          ...payload.patch,
         };
         break;
 
       case Actions.UPDATE_TAB_SUCCESS:
-        nextState = {
-          ...state,
-          savedTabs: {
-            ...state.savedTabs,
-            [payload.id]: payload,
-          },
-        };
+        if (payload) state.savedTabs[payload.id] = payload;
         break;
 
       case Actions.REMOVE_TAB_START: {
-        const openTabs = { ...state.openTabs };
-        delete openTabs[payload.tabId];
-
-        nextState = {
-          ...state,
-          openTabs,
-          savingTabs: state.savingTabs.filter((tId) => tId !== payload.tabId),
-        };
+        delete state.openTabs[`${payload.tabId}`];
+        state.savingTabs = state.savingTabs.filter(
+          (tId) => tId !== payload.tabId
+        );
         break;
       }
 
-      case Actions.REMOVE_TAB_SUCCESS: {
-        const savedTabs = { ...state.savedTabs };
-        delete savedTabs[payload.id];
-        nextState = {
-          ...state,
-          savedTabs,
-        };
+      case Actions.REMOVE_TAB_SUCCESS:
+        delete state.savedTabs[payload.id];
         break;
-      }
 
       case Actions.REOPEN_TAB:
-        nextState = {
-          ...state,
-          reOpeningTabs: [...state.reOpeningTabs, payload],
-        };
+        state.reOpeningTabs = [...state.reOpeningTabs, payload];
+        break;
     }
 
-    return nextState;
+    return state;
   }
 }
 
 export enum Actions {
-  INITIAL_STATE = 'INITIAL_STATE',
+  EMACS_RECONNECTED = 'EMACS_RECONNECTED',
   SAVE_TAB_START = 'SAVE_TAB_START',
   SAVE_TAB_SUCCESS = 'SAVE_TAB_SUCCESS',
   SAVE_TAB_FAIL = 'SAVE_TAB_FAIL',

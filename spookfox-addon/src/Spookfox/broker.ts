@@ -1,3 +1,4 @@
+import { gobbleErrorsOf } from '~src/lib';
 import { Spookfox, SFEvents } from './index';
 
 interface Packet {
@@ -20,7 +21,7 @@ export default (sf: Spookfox) => {
     sf.emit(SFEvents.DISCONNECTED, { error: p.error });
   });
 
-  sf.port.onMessage.addListener(async (pkt: Packet) => {
+  const handleNewMessage = async (pkt: Packet) => {
     // I know, thou shall not do any work here; FIXME maybe?
     if (pkt.status === 'Error') {
       console.error('spookfox-native faced an error, [err=', pkt.message, ']');
@@ -48,5 +49,7 @@ export default (sf: Spookfox) => {
     } catch (err) {
       console.error(`Bad message payload [err=${err}, msg=${pkt.message}]`);
     }
-  });
+  };
+
+  sf.port.onMessage.addListener(gobbleErrorsOf(handleNewMessage));
 };

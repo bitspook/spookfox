@@ -4,6 +4,7 @@ import OrgTabs, {
   OrgTabsState,
   SavedTab,
 } from './apps/OrgTabs';
+import { gobbleErrorsOf } from './lib';
 import { Spookfox, SFEvent, SFEvents } from './Spookfox';
 
 const run = async () => {
@@ -11,8 +12,7 @@ const run = async () => {
 
   sf.registerApp('orgTabs', OrgTabs);
 
-  // Ensure page-action icons (chained icon) for all tabs are always correct
-  sf.addEventListener(SFEvents.NEW_STATE, async (e: SFEvent) => {
+  const handleNewState = async (e: SFEvent) => {
     const tabs = await browser.tabs.query({ windowId: 1 });
     const iconColor = window.matchMedia('(prefers-color-scheme: dark)').matches
       ? 'light'
@@ -43,19 +43,23 @@ const run = async () => {
         );
       }
     });
-  });
+  };
 
-  browser.pageAction.onClicked.addListener(async (t) => {
+  // Ensure page-action icons (chained icon) for all tabs are always correct
+  sf.addEventListener(SFEvents.NEW_STATE, gobbleErrorsOf(handleNewState));
+
+  const handlePageAction = async (t: browser.tabs.Tab) => {
     const state = (sf.state as any).orgTabs as OrgTabsState;
     const openedTab = state.openTabs[t.id];
-    const localSavedTab = state.savedTabs[openedTab.savedTabId] || {};
+    const localSavedTab = state.savedTabs[openedTab?.savedTabId] || {};
     const app = sf.apps.orgTabs as OrgTabs;
-    app.dispatch(Actions.SAVE_TAB_START, openedTab.browserTabId);
+    app.dispatch(Actions.SAVE_TAB_START, openedTab?.browserTabId);
 
     try {
       const savedTab = (await sf.request(
         'TOGGLE_TAB_CHAINING',
         fromBrowserTab({
+          ...t,
           ...localSavedTab,
           ...openedTab,
         })
@@ -72,7 +76,9 @@ const run = async () => {
         error,
       });
     }
-  });
+  };
+
+  browser.pageAction.onClicked.addListener(gobbleErrorsOf(handlePageAction));
 };
 
 run().catch((err) => {

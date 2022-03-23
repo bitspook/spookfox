@@ -1,5 +1,6 @@
 import produce, { Immutable } from 'immer';
 import { v4 as uuid } from 'uuid';
+import { gobbleErrorsOf } from '~src/lib';
 import setupBroker from './broker';
 
 interface Response {
@@ -109,9 +110,15 @@ export class Spookfox extends EventTarget {
   }
 
   private setupEventListeners() {
-    this.addEventListener(SFEvents.REQUEST, this.handleRequest);
-    this.addEventListener(SFEvents.RESPONSE, this.handleResponse);
-    this.addEventListener(SFEvents.DISCONNECTED, this.handleDisconnected);
+    this.addEventListener(SFEvents.REQUEST, gobbleErrorsOf(this.handleRequest));
+    this.addEventListener(
+      SFEvents.RESPONSE,
+      gobbleErrorsOf(this.handleResponse)
+    );
+    this.addEventListener(
+      SFEvents.DISCONNECTED,
+      gobbleErrorsOf(this.handleDisconnected)
+    );
   }
 
   private reConnect() {
@@ -223,7 +230,7 @@ export class Spookfox extends EventTarget {
   /**
    * Handle `SFEvents.RESPONSE` events.
    */
-  private handleResponse(e: SFEvent<Response>) {
+  private handleResponse = async (e: SFEvent<Response>) => {
     const res = e.payload;
 
     if (!res.requestId) {
@@ -234,9 +241,9 @@ export class Spookfox extends EventTarget {
     // to build a promise based interface on request/response dance needed
     // for communication with Emacs. Check `Spookfox.getResponse`
     this.emit(res.requestId as SFEvents, res.payload);
-  }
+  };
 
-  private getResponse(requestId: string) {
+  private getResponse = (requestId: string) => {
     const maxWait = 2000;
 
     return new Promise((resolve, reject) => {
@@ -256,14 +263,14 @@ export class Spookfox extends EventTarget {
         reject(new Error('Spookfox response timeout.'));
       }, maxWait);
     });
-  }
+  };
 
   /**
    * Handle disconnection from spookfox.
    */
-  private handleDisconnected(err?: SFEvent) {
+  private handleDisconnected = async (err?: SFEvent) => {
     console.warn('Spookfox disconnected. [err=', err, ']');
-  }
+  };
 
   private rootReducer({ name, payload }: Action, state: any): any {
     const [appName, actionName] = name.split('/');
