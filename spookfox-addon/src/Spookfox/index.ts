@@ -1,5 +1,5 @@
+import produce, { Immutable } from 'immer';
 import { v4 as uuid } from 'uuid';
-import { OpenTab, SFTab } from '../tabs';
 import setupBroker from './broker';
 
 interface Response {
@@ -13,36 +13,14 @@ interface Request {
   payload: any;
 }
 
-/**
- * Mutable data we need to keep track of. Lesser the better.
- */
-export interface State {
-  // All the tabs open in browser at any time. Assumption is that this list is
-  // created when Emacs first connects, and then kept up-to-date by browser
-  // itself whenever anything related to a tab changes
-  openTabs: { [id: string]: OpenTab };
-  // All tabs which are saved in Emacs. We obtain this list when Emacs first
-  // connects. After that, any time something related to saved tabs changes,
-  // this list should be updated *after the face*. i.e make the change in Emacs,
-  // and then ask Emacs how this list looks like; either by asking for the whole
-  // list again, or designing the response such that Emacs returns the updated
-  // `SFTab`
-  savedTabs: { [id: string]: SFTab };
-  // Firefox containers, when configured to "auto-close tabs" cause a
-  // race-condition where they rapidly create+close+create tabs. In this case,
-  // the close callback gets called very quickly. On tab create, Emacs save the
-  // tab and respond with the saved tab. But before it can do this, Firefox has
-  // already closed the tab and emitted onClosed event. onClosed checks if we
-  // already saved the tab, and since saving the tab hasn't finished yet,
-  // concludes that we haven't. So this rapidly closed tab don't get removed
-  // from Emacs. To resolve this, we need a `savingTabs` which keeps track if
-  // tabs which are under-process of being saved.
-  savingTabs: number[];
-  // Let's maintain a list of tab we are reopening, so the 'new tab' handler
-  // knows whether to instruct Emacs to create a new org entry, or update an
-  // existing one
-  // Please read 'Reopening a saved tab' flow in architecture doc
-  reOpeningTabs: Array<{ id: string; url: string }>;
+export interface SFApp<S> {
+  name: string;
+  initialState: Immutable<S>;
+  reducer: (action: { name: string; payload: any }, state: S) => S;
+}
+
+export interface SFAppConstructor<S> {
+  new (name: string, sf: Spookfox): SFApp<S>;
 }
 
 /**
@@ -67,11 +45,7 @@ export enum SFEvents {
  * A custom event which has an optional payload attached.
  */
 export class SFEvent<P = any> extends Event {
-  constructor(
-    public name: string,
-    public payload?: P,
-    public debugMessage?: string
-  ) {
+  constructor(public name: string, public payload?: P) {
     super(name);
   }
 }
@@ -98,50 +72,49 @@ export class SFEvent<P = any> extends Event {
 // custom events. We rely on custom events to build independent modules, while
 // providing a unified interface.
 export class Spookfox extends EventTarget {
-  state: State = {
-    openTabs: {},
-    savedTabs: {},
-    savingTabs: [],
-    reOpeningTabs: [],
-  };
+  state = {};
   reqHandlers = {};
+  // This is needed only for re-init hack
+  eventListeners = [];
   debug: boolean;
+  apps: { [name: string]: SFApp<any> } = {};
 
-  constructor(public port?: browser.runtime.Port, public windowId = 1) {
+  constructor(public port?: browser.runtime.Port) {
     super();
     if (!port) {
-      this.port = this.connect();
+      this.port = this.reConnect();
     }
     this.debug = Boolean(localStorage.getItem('SPOOKFOX_DEBUG'));
-    this.init();
-  }
-
-  private init() {
     setupBroker(this);
     this.setupEventListeners();
   }
 
   private reInit() {
-    this.port = this.connect();
-    this.teardownEventListeners();
-    this.init();
+    this.port = this.reConnect();
+
+    for (const l of this.eventListeners) {
+      this.removeEventListener(l.type, l.callback);
+      super.addEventListener(l.type, l.callback);
+    }
+
+    setupBroker(this);
+  }
+
+  addEventListener(
+    type: string,
+    callback: EventListenerOrEventListenerObject
+  ): void {
+    this.eventListeners.push({ type, callback });
+    super.addEventListener(type, callback);
   }
 
   private setupEventListeners() {
     this.addEventListener(SFEvents.REQUEST, this.handleRequest);
     this.addEventListener(SFEvents.RESPONSE, this.handleResponse);
-    this.addEventListener(SFEvents.EMACS_CONNECTED, this.handleConnected);
     this.addEventListener(SFEvents.DISCONNECTED, this.handleDisconnected);
   }
 
-  private teardownEventListeners() {
-    this.removeEventListener(SFEvents.REQUEST, this.handleRequest);
-    this.removeEventListener(SFEvents.RESPONSE, this.handleResponse);
-    this.removeEventListener(SFEvents.EMACS_CONNECTED, this.handleConnected);
-    this.removeEventListener(SFEvents.DISCONNECTED, this.handleDisconnected);
-  }
-
-  private connect() {
+  private reConnect() {
     if (this.port) this.port.disconnect();
 
     return browser.runtime.connectNative('spookfox');
@@ -182,8 +155,8 @@ export class Spookfox extends EventTarget {
   /**
    * A convenience function for emitting new events to `Spookfox`.
    */
-  emit(name: SFEvents, payload?: object, msg?: string) {
-    this.dispatchEvent(new SFEvent(name, payload, msg));
+  emit(name: SFEvents, payload?: object) {
+    this.dispatchEvent(new SFEvent(name, payload));
   }
 
   /**
@@ -208,20 +181,24 @@ export class Spookfox extends EventTarget {
     this.reqHandlers[name] = handler;
   }
 
+  registerApp<S>(name: string, App: SFAppConstructor<S>) {
+    this.apps[name] = new App(name, this);
+    this.state[name] = this.apps[name].initialState;
+  }
+
   /**
    * Change Spookfox state. Calling this will set the state to new given state,
    * and emit `SFEvents.NEW_STATE` event.
    * Spookfox.state should be treated as immutable and shouldn't be modified in-place.
-   * Instead, use `Spookfox.newState(s: State)` to replace existing state as a whole.
    * # Example
    * ```
    * const newState = { ... };
    * sf.newState(newState, 'X kind of change.');
    * ```
    */
-  newState(s: State, debugMsg?: string) {
+  private newState(s: any) {
     this.state = s;
-    this.emit(SFEvents.NEW_STATE, s, debugMsg);
+    this.emit(SFEvents.NEW_STATE, s);
   }
 
   /**
@@ -232,9 +209,7 @@ export class Spookfox extends EventTarget {
     const executioner = this.reqHandlers[request.name];
 
     if (!executioner) {
-      console.warn(
-        `No handler for request [request=${JSON.stringify(request)}]`
-      );
+      console.warn('No handler for request', { request });
       return;
     }
     const response = await executioner(request.payload, this);
@@ -284,156 +259,50 @@ export class Spookfox extends EventTarget {
   }
 
   /**
-   * Initialize `Spookfox.state` When Emacs first connects.
-   */
-  private async handleConnected() {
-    const savedTabs = (await this.request('GET_SAVED_TABS')) as SFTab[];
-    const currentTabs = await browser.tabs.query({ windowId: this.windowId });
-
-    // Problem: There might be tabs with same URLs
-    // Solution: First open tab in browser is mapped to first tab saved in Emacs.
-    // Catch: Every time this function runs, all current tabs which match urls
-    // saved in Emacs are mapped; regardless of whether user meant it or not.
-    const takenSavedTabIds = [];
-    const openTabs = currentTabs.reduce((accum, tab) => {
-      const savedTab = savedTabs.find(
-        (st) => st.url === tab.url && takenSavedTabIds.indexOf(st.id) === -1
-      );
-      if (savedTab) {
-        takenSavedTabIds.push(savedTab.id);
-        accum[tab.id] = {
-          savedTabId: savedTab.id,
-          ...tab,
-        };
-      } else {
-        accum[tab.id] = tab;
-      }
-
-      return accum;
-    }, {});
-
-    const savedTabsMap = savedTabs.reduce((accum, tab) => {
-      accum[tab.id] = tab;
-      return accum;
-    }, {});
-
-    const initialState = {
-      ...this.state,
-      openTabs,
-      savedTabs: savedTabsMap,
-    };
-
-    this.dispatch(Actions.INITIAL_STATE, initialState);
-  }
-
-  /**
    * Handle disconnection from spookfox.
    */
   private handleDisconnected(err?: SFEvent) {
     console.warn('Spookfox disconnected. [err=', err, ']');
   }
 
-  private rootReducer({ name, payload }: Action, state: State): State {
+  private rootReducer({ name, payload }: Action, state: any): any {
+    const [appName, actionName] = name.split('/');
+
+    if (!appName || !actionName) {
+      throw new Error(
+        'Invalid Action "`${name}`". Action should be in format "<app-name>/<action-name>"'
+      );
+    }
+
     if (this.debug) {
       console.groupCollapsed(name);
       console.log('Payload', payload);
     }
 
-    let nextState = state;
-    switch (name) {
-      case Actions.INITIAL_STATE:
-        nextState = payload;
-        break;
+    const app = this.apps[appName];
 
-      case Actions.SAVE_TAB_START:
-        nextState = {
-          ...state,
-          savingTabs: [...state.savingTabs, payload],
-        };
-        break;
-
-      case Actions.SAVE_TAB_SUCCESS:
-        nextState = {
-          ...state,
-          savedTabs: {
-            ...state.savedTabs,
-            [payload.savedTab.id]: payload.savedTab,
-          },
-          openTabs: {
-            ...state.openTabs,
-            [payload.openedTab.id.toString()]: {
-              ...payload.openedTab,
-              savedTabId: payload.savedTab.id,
-            },
-          },
-          savingTabs: state.savingTabs.filter(
-            (id) => id !== payload.openedTab.id
-          ),
-          reOpeningTabs: state.reOpeningTabs.filter(
-            ({ id }) => id !== payload.savedTab.id
-          ),
-        };
-        break;
-
-      case Actions.UPDATE_TAB_START:
-        nextState = {
-          ...state,
-          openTabs: {
-            ...state.openTabs,
-            [payload.tabId]: {
-              ...state.openTabs[payload.tabId],
-              ...payload.patch,
-            },
-          },
-        };
-        break;
-
-      case Actions.UPDATE_TAB_SUCCESS:
-        nextState = {
-          ...state,
-          savedTabs: {
-            ...state.savedTabs,
-            [payload.id]: payload,
-          },
-        };
-        break;
-
-      case Actions.REMOVE_TAB_START: {
-        const openTabs = { ...state.openTabs };
-        delete openTabs[payload.tabId];
-
-        nextState = {
-          ...state,
-          openTabs,
-          savingTabs: state.savingTabs.filter((tId) => tId !== payload.tabId),
-        };
-        break;
-      }
-
-      case Actions.REMOVE_TAB_SUCCESS: {
-        const savedTabs = { ...state.savedTabs };
-        delete savedTabs[payload.id];
-        nextState = {
-          ...state,
-          savedTabs,
-        };
-        break;
-      }
-
-      case Actions.REOPEN_TAB:
-        nextState = {
-          ...state,
-          reOpeningTabs: [...state.reOpeningTabs, payload],
-        };
+    if (!app) {
+      throw new Error(
+        `Could not find Spookfox app "${appName}". Was it registered?`
+      );
     }
 
-    console.log('Next state', nextState);
-    console.groupEnd();
+    const nextState = produce(this.state, (draft: typeof app.initialState) => {
+      draft[appName] = app.reducer(
+        { name: actionName, payload },
+        draft[appName]
+      );
+    });
+
+    if (this.debug) {
+      console.log('Next state', nextState);
+      console.groupEnd();
+    }
 
     return nextState;
   }
 
-  dispatch(name: Actions, payload: any) {
+  dispatch(name: string, payload: any) {
     // Need to manually do the error handling here because Firefox is eating
     // these errors up and not showing them in addon's console
     try {
@@ -445,25 +314,11 @@ export class Spookfox extends EventTarget {
   }
 }
 
-export enum Actions {
-  INITIAL_STATE = 'INITIAL_STATE',
-  SAVE_TAB_START = 'SAVE_TAB_START',
-  SAVE_TAB_SUCCESS = 'SAVE_TAB_SUCCESS',
-  SAVE_TAB_FAIL = 'SAVE_TAB_FAIL',
-  UPDATE_TAB_START = 'UPDATE_TAB_START',
-  UPDATE_TAB_SUCCESS = 'UPDATE_TAB_SUCCESS',
-  UPDATE_TAB_FAIL = 'UPDATE_TAB_FAIL',
-  REMOVE_TAB_START = 'REMOVE_TAB_START',
-  REMOVE_TAB_SUCCESS = 'REMOVE_TAB_SUCCESS',
-  REMOVE_TAB_FAIL = 'REMOVE_TAB_FAIL',
-  REOPEN_TAB = 'REOPEN_TAB',
-}
-
 export enum EmacsRequests {
   TOGGLE_TAB_CHAINING = 'TOGGLE_TAB_CHAINING',
 }
 
 interface Action {
-  name: Actions;
+  name: string;
   payload?: any;
 }
