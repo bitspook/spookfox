@@ -6,7 +6,7 @@
     "start": "parcel serve src/manifest.json",
     "build": "parcel build src/manifest.json",
     "lint": "eslint src/ && tsc --noEmit",
-    "publish-addon": "yarn build && web-ext sign --channel=listed -s ./dist -a ./dist/addons --api-key $FIREFOX_ADDON_KEY --api-secret $FIREFOX_ADDON_SECRET"
+    "publish-addon": "yarn build && web-ext sign --channel=unlisted -s ./dist -a ./dist/addons --api-key $FIREFOX_ADDON_KEY --api-secret $FIREFOX_ADDON_SECRET"
   },
   "devDependencies": {
     "@parcel/config-webextension": "^2.3.2",
