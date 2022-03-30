@@ -316,6 +316,8 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
         );
         this.dispatch(Actions.REMOVE_TAB_FAIL, { tabId, error });
       }
+    } else {
+      this.dispatch(Actions.REMOVE_TAB_SUCCESS, null);
     }
   };
 
@@ -404,7 +406,7 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
       }
 
       case Actions.REMOVE_TAB_SUCCESS:
-        delete state.savedTabs[payload.id];
+        if (payload?.id) delete state.savedTabs[payload.id];
         break;
 
       case Actions.REOPEN_TAB:

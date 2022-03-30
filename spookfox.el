@@ -94,7 +94,8 @@ responses."
 
 (defun sf--connected-p ()
   "Return t if connection to spookfox-native is not established."
-  (and sf--connection (not (eq (process-status sf--connection) 'closed))))
+  (and sf--connection (not (or (eq (process-status sf--connection) 'closed)
+                               (eq (process-status sf--connection) 'stop)))))
 
 (defun sf--connect ()
   "Connect or re-connect to spookfox browser addon."

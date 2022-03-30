@@ -109,6 +109,16 @@ export class Spookfox extends EventTarget {
     super.addEventListener(type, callback);
   }
 
+  removeEventListener(
+    type: string,
+    callback: EventListenerOrEventListenerObject
+  ): void {
+    this.eventListeners = this.eventListeners.filter(
+      (el) => !(el.type === type && el.callback === callback)
+    );
+    super.removeEventListener(type, callback);
+  }
+
   private setupEventListeners() {
     this.addEventListener(SFEvents.REQUEST, gobbleErrorsOf(this.handleRequest));
     this.addEventListener(
@@ -144,19 +154,7 @@ export class Spookfox extends EventTarget {
 
     this.port.postMessage(request);
 
-    try {
-      const res = await this.getResponse(request.id);
-      return res;
-    } catch (err) {
-      // If the response times-out, it is quite likely #14 happening. Try to
-      // brush it-off by reinitializing spookfox
-      if (/timeout/.test(err.message.toLowerCase())) {
-        console.warn('Response timed out. Reinitializing Spookfox');
-        this.reInit();
-        this.port.postMessage(request);
-        return this.getResponse(request.id);
-      }
-    }
+    return this.getResponse(request.id);
   }
 
   /**
@@ -244,7 +242,7 @@ export class Spookfox extends EventTarget {
   };
 
   private getResponse = (requestId: string) => {
-    const maxWait = 2000;
+    const maxWait = 5000;
 
     return new Promise((resolve, reject) => {
       const listener = (event: SFEvent) => {
@@ -268,8 +266,8 @@ export class Spookfox extends EventTarget {
   /**
    * Handle disconnection from spookfox.
    */
-  private handleDisconnected = async (err?: SFEvent) => {
-    console.warn('Spookfox disconnected. [err=', err, ']');
+  private handleDisconnected = async (event?: SFEvent) => {
+    console.warn('Spookfox disconnected.', { event });
   };
 
   private rootReducer({ name, payload }: Action, state: any): any {
