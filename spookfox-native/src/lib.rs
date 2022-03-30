@@ -11,23 +11,21 @@ pub mod packet;
 
 use packet::*;
 
-enum CrossThreadMsg {
+pub enum CrossThreadMsg {
     Connection(UnixStream),
     Packet(Packet),
 }
 
-pub fn spawn_socket_server(socket_path: &str) -> io::Result<()> {
+pub fn spawn_socket_server(
+    socket_path: &str,
+    tx: mpsc::Sender<CrossThreadMsg>,
+    rx: mpsc::Receiver<CrossThreadMsg>,
+) -> io::Result<()> {
     if std::fs::remove_file(socket_path).is_ok() {
         eprintln!("Deleted existing socket: {}", socket_path);
     }
 
     let socket = UnixListener::bind(socket_path)?;
-    // Cross-thread communication is needed to keep track of all the clients
-    // that connect to our socket. We can get away with having just 2 open
-    // connections, but for the sake of debugging and future extension, we are
-    // accepting n number of connections, where n is limited by number of
-    // threads OS can open, and number of connections socket can support
-    let (tx, rx) = mpsc::channel();
 
     std::thread::spawn(move || {
         socket.incoming().into_iter().for_each(|connection| {
@@ -36,7 +34,6 @@ pub fn spawn_socket_server(socket_path: &str) -> io::Result<()> {
 
                 tx.send(CrossThreadMsg::Connection(stream)).unwrap();
 
-                let tx = tx.clone();
                 std::thread::spawn(move || {
                     let listener = BufReader::new(&listener);
 
@@ -46,10 +43,7 @@ pub fn spawn_socket_server(socket_path: &str) -> io::Result<()> {
                     listener.lines().into_iter().for_each(|line| {
                         if let Ok(line) = line {
                             match serde_json::from_str::<Packet>(line.trim()) {
-                                Ok(msg) => match msg.sender {
-                                    Sender::Emacs => cn::send!(msg),
-                                    Sender::Browser => tx.send(CrossThreadMsg::Packet(msg)).unwrap(),
-                                },
+                                Ok(msg) => cn::send!(msg),
                                 Err(err) => {
                                     // If a client posts invalid message, like badly
                                     // crafted packets from Emacs; they are
@@ -78,21 +72,33 @@ pub fn spawn_socket_server(socket_path: &str) -> io::Result<()> {
         });
     });
 
-    std::thread::spawn(|| {
+    std::thread::spawn(move || {
         let mut connections = vec![];
         for msg in rx {
             match msg {
-                CrossThreadMsg::Connection(conn) => connections.push(conn),
+                CrossThreadMsg::Connection(conn) => {
+                    connections.push(conn);
+                }
                 CrossThreadMsg::Packet(msg) => {
                     for mut conn in &connections {
-                        conn.write_all((json!(msg).to_string() + "\n").as_bytes())?;
-                        conn.flush()?;
+                        conn.flush().unwrap();
+                        if conn
+                            .write((json!(msg).to_string() + "\n").as_bytes())
+                            .is_err()
+                        {
+                            let msg = Packet {
+                                status: Status::Error,
+                                sender: Sender::Emacs,
+                                message: Value::String(
+                                    "Failed to send message to spookfox-native client.".to_string(),
+                                ),
+                            };
+                            cn::send!(msg)
+                        }
                     }
                 }
             }
         }
-
-        io::Result::Ok(())
     });
 
     Ok(())
