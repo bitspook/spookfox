@@ -414,7 +414,7 @@ PAYLOAD is a plist with :id and :patch"
 
 (defvar sf--native-executable (expand-file-name "spookfox-native" spookfox-native-installation-dir))
 
-(defvar spookfox-version "0.1.12"
+(defvar spookfox-version "0.1.13"
   "Spookfox version.")
 
 (defun sf--download-native ()
