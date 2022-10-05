@@ -167,6 +167,9 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
         browser.pageAction.show(tab.id);
       } catch (err) {
         if (/invalid tab id/.test(err.message.toLowerCase())) {
+          if (this.sf.debug) {
+            console.warn(err);
+          }
           // pass. Tab has been deleted somehow, e.g Firefox containers do this
           // rapid tab open/close dance
           return;
@@ -433,7 +436,10 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
 
       case Actions.SAVE_TAB_SUCCESS: {
         state.savedTabs[payload.savedTab.id] = payload.savedTab;
-        state.openTabs[payload.openedTab.browserTabId] = payload.openedTab;
+        state.openTabs[payload.openedTab.browserTabId] = {
+          ...payload.openedTab,
+          savedTabId: payload.savedTab.id,
+        };
         state.savingTabs = state.savingTabs.filter(
           (id) => id !== payload.openedTab.browserTabId
         );

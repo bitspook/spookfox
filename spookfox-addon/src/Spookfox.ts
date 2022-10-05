@@ -213,7 +213,7 @@ export class Spookfox extends EventTarget {
    * sf.newState(newState, 'X kind of change.');
    * ```
    */
-  private newState(s: any) {
+  private replaceState(s: any) {
     this.state = s;
     this.emit(SFEvents.NEW_STATE, s);
   }
@@ -327,7 +327,7 @@ export class Spookfox extends EventTarget {
     // these errors up and not showing them in addon's console
     try {
       const newState = this.rootReducer({ name, payload });
-      this.newState(newState);
+      this.replaceState(newState);
     } catch (err) {
       console.error('Error during dispatching action, [err=', err, ']');
     }
