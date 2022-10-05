@@ -1,5 +1,5 @@
 import { Draft, freeze, Immutable } from 'immer';
-import { SFApp, SFEvents, Spookfox } from '~src/Spookfox';
+import { SFApp, SFEvent, SFEvents, Spookfox } from '~src/Spookfox';
 import { gobbleErrorsOf, sleep } from '~src/lib';
 
 export type OrgTabsState = Immutable<{
@@ -94,9 +94,6 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
   }
 
   constructor(public name: string, public sf: Spookfox) {
-    this.name = name;
-    this.sf = sf;
-
     sf.addEventListener(
       SFEvents.EMACS_CONNECTED,
       gobbleErrorsOf(this.handleConnected)
@@ -122,7 +119,80 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
       EmacsRequests.SEARCH_FOR,
       gobbleErrorsOf(this.openSearchTab)
     );
+    sf.addEventListener(SFEvents.NEW_STATE, this.syncChainIcon);
+
+    this.addBrowserPageAction();
   }
+
+  addBrowserPageAction = () => {
+    const sf = this.sf;
+
+    const handlePageAction = async (t: browser.tabs.Tab) => {
+      const state = (sf.state as any)[this.name] as OrgTabsState;
+      const openedTab = state.openTabs[t.id];
+      const localSavedTab = state.savedTabs[openedTab?.savedTabId] || {};
+      const app = sf.apps[this.name] as OrgTabs;
+      app.dispatch(Actions.SAVE_TAB_START, openedTab?.browserTabId);
+
+      try {
+        const savedTab = (await sf.request(
+          'TOGGLE_TAB_CHAINING',
+          fromBrowserTab({
+            ...t,
+            ...localSavedTab,
+            ...openedTab,
+          })
+        )) as SavedTab;
+        // FIXME This should be a part of OrgTabs app
+        (sf.apps[this.name] as OrgTabs).dispatch(Actions.SAVE_TAB_SUCCESS, {
+          savedTab,
+          openedTab,
+        });
+      } catch (error) {
+        console.error(`Error during page-action. [err=${error}]`);
+        (sf.apps[this.name] as OrgTabs).dispatch(Actions.SAVE_TAB_FAIL, {
+          openedTab,
+          error,
+        });
+      }
+    };
+
+    browser.pageAction.onClicked.addListener(gobbleErrorsOf(handlePageAction));
+  };
+
+  // Ensure page-action icons (chained icon) for all tabs are always correct
+  syncChainIcon = async (e: SFEvent) => {
+    const tabs = await browser.tabs.query({ windowId: 1 });
+    const iconColor = window.matchMedia('(prefers-color-scheme: dark)').matches
+      ? 'light'
+      : 'dark';
+    const state: OrgTabsState = e.payload[this.name];
+
+    tabs.forEach(async (tab) => {
+      const openTab = state.openTabs[tab.id];
+      const savedTab = state.savedTabs[openTab?.savedTabId];
+      let icon = `icons/unchained-${iconColor}.svg`;
+
+      if (savedTab && savedTab.chained) {
+        icon = `icons/chained-${iconColor}.svg`;
+      }
+
+      try {
+        await browser.pageAction.setIcon({ tabId: tab.id, path: icon });
+        browser.pageAction.show(tab.id);
+      } catch (err) {
+        if (/invalid tab id/.test(err.message.toLowerCase())) {
+          // pass. Tab has been deleted somehow, e.g Firefox containers do this
+          // rapid tab open/close dance
+          return;
+        }
+
+        console.warn(
+          `Error occurred while setting pageAction icon. [err=${err}]`
+        );
+      }
+    });
+  };
 
   /**
    * Get the active tab of first browser window. Let's not go in the nuances of

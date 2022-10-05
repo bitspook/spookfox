@@ -35,6 +35,8 @@
 (defun spookfox--handle-new-client (ws)
   "When a new client connects, save the connected websocket WS."
   (push ws spookfox--connected-clients)
+  (dolist (app spookfox-enabled-apps)
+    (spookfox-request 'enable-app app))
   (spookfox--log "[CONNECTED] Total clients: %s" (length spookfox--connected-clients)))
 
 (defun spookfox--handle-disconnect-client (ws)
@@ -92,7 +94,10 @@ responses."
   "Make a request with NAME and optionally a PAYLOAD to browser.
 Returns the request-id so the caller can retrieve a response
 corresponding to this request."
-  (let ((id (org-id-uuid)))
+  (let ((id (org-id-uuid))
+        (name (if (symbolp name)
+                  (string-replace "-" "_" (upcase (symbol-name name)))
+                (upcase name))))
     (spookfox--send-msg
      (json-encode `((name . ,name)
                     (id . ,id)

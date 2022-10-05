@@ -23,6 +23,8 @@
 (defvar spookfox-version "0.2.0"
   "Spookfox version.")
 
+(defconst spookfox-available-apps '(org-tabs))
+(defvar spookfox-enabled-apps '(org-tabs))
 
 (provide 'spookfox)
 ;;; spookfox.el ends here

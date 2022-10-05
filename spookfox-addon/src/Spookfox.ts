@@ -75,7 +75,7 @@ export class Spookfox extends EventTarget {
   eventListeners = [];
   debug: boolean;
   apps: { [name: string]: SFApp<any> } = {};
-  wsUrl = "ws://localhost:59001";
+  wsUrl = 'ws://localhost:59001';
   ws: WebSocket;
 
   constructor() {
@@ -127,7 +127,7 @@ export class Spookfox extends EventTarget {
     } catch (err) {
       console.error(`Bad ws message [err=${err}, msg=${event.data}]`);
     }
-  };
+  }
 
   private connect() {
     if (this.ws) this.ws.close();
@@ -193,7 +193,7 @@ export class Spookfox extends EventTarget {
       );
     }
 
-    this.reqHandlers[name] = handler;
+    this.reqHandlers[name.toUpperCase()] = handler;
   }
 
   registerApp<S>(name: string, App: SFAppConstructor<S>) {
@@ -221,7 +221,8 @@ export class Spookfox extends EventTarget {
    */
   private handleRequest = async (e: SFEvent<Request>) => {
     const request = e.payload;
-    const executioner = this.reqHandlers[request.name];
+
+    const executioner = this.reqHandlers[request.name.toUpperCase()];
 
     if (!executioner) {
       console.warn('No handler for request', { request });
@@ -229,10 +230,12 @@ export class Spookfox extends EventTarget {
     }
     const response = await executioner(request.payload, this);
 
-    return this.ws.send(JSON.stringify({
-      requestId: request.id,
-      payload: response,
-    }));
+    return this.ws.send(
+      JSON.stringify({
+        requestId: request.id,
+        payload: response,
+      })
+    );
   };
 
   /**
@@ -327,10 +330,6 @@ export class Spookfox extends EventTarget {
       console.error('Error during dispatching action, [err=', err, ']');
     }
   }
-}
-
-export enum EmacsRequests {
-  TOGGLE_TAB_CHAINING = 'TOGGLE_TAB_CHAINING',
 }
 
 interface Action {
