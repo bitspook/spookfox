@@ -17,14 +17,18 @@ export default (sf: Spookfox) => {
   /**
    * Inform `Spookfox` when browser disconnects from spookfox-native for any reason.
    */
-  sf.port.onDisconnect.addListener((p) => {
-    sf.emit(SFEvents.DISCONNECTED, { error: p.error });
-  });
+  // sf.port.onDisconnect.addListener((p) => {
+  //   sf.emit(SFEvents.DISCONNECTED, { error: p.error });
+  // });
+  sf.ws.onclose((ws: WebSocket, event: CloseEvent) => {
+    sf.emit(SFEvents.DISCONNECTED, { event });
+  })
 
-  const handleNewMessage = async (pkt: Packet) => {
+  const handleNewMessage = async (event: MessageEvent<string>) => {
+    const pkt: Packet = JSON.parse(event.data);
     // I know, thou shall not do any work here; FIXME maybe?
     if (pkt.status === 'Error') {
-      console.error('spookfox-native faced an error, [err=', pkt.message, ']');
+      console.error('spookfox-server faced an error, [err=', pkt.message, ']');
       return;
     }
     // FIXME too while you're at it.
@@ -51,5 +55,5 @@ export default (sf: Spookfox) => {
     }
   };
 
-  sf.port.onMessage.addListener(gobbleErrorsOf(handleNewMessage));
+  sf.ws.onmessage(gobbleErrorsOf(handleNewMessage));
 };
