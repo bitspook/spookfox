@@ -3,6 +3,7 @@ import { v4 as uuid } from 'uuid';
 import { gobbleErrorsOf } from '~src/lib';
 
 interface Response {
+  type: 'response';
   requestId: string;
   payload: any;
 }
@@ -11,6 +12,7 @@ interface Request {
   id: string;
   name: string;
   payload: any;
+  type: 'request';
 }
 
 export interface SFApp<S> {
@@ -104,15 +106,9 @@ export class Spookfox extends EventTarget {
   }
 
   private setupEventListeners() {
-    this.addEventListener(SFEvents.REQUEST, gobbleErrorsOf(this.handleRequest));
-    this.addEventListener(
-      SFEvents.RESPONSE,
-      gobbleErrorsOf(this.handleResponse)
-    );
-    this.addEventListener(
-      SFEvents.DISCONNECTED,
-      gobbleErrorsOf(this.handleDisconnected)
-    );
+    this.addEventListener(SFEvents.REQUEST, this.handleRequest);
+    this.addEventListener(SFEvents.RESPONSE, this.handleResponse);
+    this.addEventListener(SFEvents.DISCONNECTED, this.handleDisconnected);
   }
 
   private async handleServerMsg(event: MessageEvent<string>) {
@@ -232,7 +228,7 @@ export class Spookfox extends EventTarget {
 
     return this.ws.send(
       JSON.stringify({
-        requestId: request.id,
+        id: request.id,
         payload: response,
       })
     );
@@ -245,7 +241,7 @@ export class Spookfox extends EventTarget {
     const res = e.payload;
 
     if (!res.requestId) {
-      throw new Error(`Invalid response: [res=${res}]`);
+      throw new Error(`Invalid response: [res=${JSON.stringify(res)}]`);
     }
 
     // Emit a unique event per `requestId`. Shenanigans I opted for doing

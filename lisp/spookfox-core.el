@@ -36,7 +36,7 @@
   "When a new client connects, save the connected websocket WS."
   (push ws spookfox--connected-clients)
   (dolist (app spookfox-enabled-apps)
-    (spookfox-request 'enable-app app))
+    (spookfox-request ws 'enable-app app))
   (spookfox--log "[CONNECTED] Total clients: %s" (length spookfox--connected-clients)))
 
 (defun spookfox--handle-disconnect-client (ws)
@@ -48,10 +48,12 @@
   "Handle WS server error ERR in SYM callback."
   (warn "[spookfox-server] Error %s occurred in %s" err sym))
 
-(defun spookfox--send-msg (msg)
-  "Send MSG to all connected clients."
-  (cl-dolist (ws spookfox--connected-clients)
-    (websocket-send-text ws msg)))
+(defun spookfox--send-msg (msg &optional client-ws)
+  "Send MSG to all connected clients.
+If CLIENT-WS is provided, message is ent only to this client."
+  (if client-ws (websocket-send-text client-ws msg)
+    (cl-dolist (ws spookfox--connected-clients)
+      (websocket-send-text ws msg))))
 
 (defun spookfox--handle-msg (_ws frame)
   "Choose what to do with FRAME sent by a connected client.
@@ -90,8 +92,8 @@ responses."
          :on-message #'spookfox--handle-msg
          :on-error #'spookfox--handle-server-error)))
 
-(defun spookfox-request (name &optional payload)
-  "Make a request with NAME and optionally a PAYLOAD to browser.
+(defun spookfox-request (client-ws name &optional payload)
+  "Make a request to CLIENT-WS with NAME and optionally a PAYLOAD to browser.
 Returns the request-id so the caller can retrieve a response
 corresponding to this request."
   (let ((id (org-id-uuid))
@@ -101,8 +103,14 @@ corresponding to this request."
     (spookfox--send-msg
      (json-encode `((name . ,name)
                     (id . ,id)
-                    (payload . ,payload))))
+                    (payload . ,payload)))
+     client-ws)
     id))
+
+(defun spookfox-request-all (name &optional payload)
+  "Make a NAME request to all connected spookfox clients with optional PAYLOAD."
+  (dolist (ws spookfox--connected-clients)
+    (spookfox-request ws name payload)))
 
 (defun spookfox--poll-last-msg-payload (&optional retry-count)
   "Synchronously provide latest message received from browser.
@@ -122,9 +130,11 @@ reaching exit condition in recursive re-checks."
       (setq spookfox--last-response nil)
       msg)))
 
-(defun spookfox--handle-request (request)
-  "Handle REQUEST sent from browser."
-  (let* ((handler (cdr (assoc (plist-get request :name) spookfox--req-handlers-alist #'string=)))
+(defun spookfox--handle-request (request &optional client-ws)
+  "Handle REQUEST sent from browser.
+If CLIENT-WS is provided, response is sent to this client only."
+  (let* ((request-name (plist-get request :name))
+         (handler (cdr (assoc request-name spookfox--req-handlers-alist #'string=)))
          (request-id (or (plist-get request :id) "<unknown>"))
          (req-payload (mapcar
                        (lambda (x)
@@ -137,8 +147,12 @@ reaching exit condition in recursive re-checks."
                            ("null" nil)
                            (val val)))
                        (plist-get request :payload)))
-         (res-payload (when handler (funcall handler req-payload))))
-    (spookfox--send-msg (json-encode `(:requestId ,request-id :payload ,res-payload)))))
+         (res-payload (if handler (funcall handler req-payload)
+                        `((status . error)
+                          (message . ,(format "Unknown request: %s" request-name))))))
+    (spookfox--send-msg (json-encode `((requestId . ,request-id)
+                                       (payload . ,res-payload)))
+                        client-ws)))
 
 (defun spookfox--register-req-handler (request handler)
   "Run HANDLER every time REQUEST is received from browser.
