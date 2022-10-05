@@ -435,7 +435,7 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
         state.savedTabs[payload.savedTab.id] = payload.savedTab;
         state.openTabs[payload.openedTab.browserTabId] = payload.openedTab;
         state.savingTabs = state.savingTabs.filter(
-          (id) => id !== payload.openedTab.id
+          (id) => id !== payload.openedTab.browserTabId
         );
         state.reOpeningTabs = state.reOpeningTabs.filter(
           ({ id }) => id !== payload.savedTab.id
