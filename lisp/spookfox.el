@@ -18,9 +18,7 @@
 ;;;
 ;;; Code:
 
-(require 'spookfox-lib)
 (require 'spookfox-core)
-(require 'spookfox-server)
 
 (defvar spookfox-version "0.2.0"
   "Spookfox version.")

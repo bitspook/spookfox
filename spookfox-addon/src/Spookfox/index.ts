@@ -115,14 +115,9 @@ export class Spookfox extends EventTarget {
     );
   }
 
-  private async handleNewWsMessage(_ws: WebSocket, event: MessageEvent<string>) {
+  private async handleServerMsg(event: MessageEvent<string>) {
     try {
       const msg = JSON.parse(event.data);
-      // Handle this event as a special case to provide a uniform interface through
-      // `Spookfox`.
-      if (msg.name === 'CONNECTED') {
-        return this.emit(SFEvents.EMACS_CONNECTED);
-      }
 
       if (msg.name) {
         return this.emit(SFEvents.REQUEST, msg);
@@ -147,7 +142,7 @@ export class Spookfox extends EventTarget {
       this.emit(SFEvents.DISCONNECTED);
     };
 
-    this.ws.onmessage = this.handleNewWsMessage.bind(this);
+    this.ws.onmessage = this.handleServerMsg.bind(this);
 
     return this.ws;
   }
