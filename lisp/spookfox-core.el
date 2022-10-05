@@ -13,15 +13,16 @@
 (require 'websocket)
 (require 'spookfox-lib)
 
+(defvar spookfox-version "0.2.0"
+  "Spookfox version.")
+(defvar spookfox-available-apps nil)
+(defvar spookfox-enabled-apps nil)
 (defvar spookfox--last-response nil
   "Most recently received response from browser.")
-
 (defvar spookfox--req-handlers-alist nil
   "A mapping of spookfox requests and their handlers.")
-
 (defvar spookfox--last-faulty-msg nil
   "Last Packet which caused a json encoding error. Useful for debugging.")
-
 (defvar spookfox-server--port 59001)
 (defvar spookfox--connected-clients nil)
 (defvar spookfox--server-process nil)
@@ -31,6 +32,13 @@
   (with-current-buffer (get-buffer-create "*spookfox*")
     (goto-char (point-max))
     (insert (apply #'format (concat "\n" msg) args))))
+
+(defun spookfox--enable-app (app)
+  "Register spookfox-app APP.
+A spookfox APP is anything given there is a function named
+spookfox--<app>-init, which is called to enable the app."
+  (let* ((init-fn (alist-get app spookfox-available-apps)))
+    (funcall init-fn)))
 
 (defun spookfox--handle-new-client (ws)
   "When a new client connects, save the connected websocket WS."
@@ -44,7 +52,7 @@
   (setf spookfox--connected-clients (cl-remove-if (lambda (saved-ws) (eq saved-ws ws)) spookfox--connected-clients))
   (spookfox--log "[DISCONNECTED] Total clients: %s" (length spookfox--connected-clients)))
 
-(defun spookfox--handle-server-error (ws sym err)
+(defun spookfox--handle-server-error (_ws sym err)
   "Handle WS server error ERR in SYM callback."
   (warn "[spookfox-server] Error %s occurred in %s" err sym))
 
@@ -158,7 +166,7 @@ If CLIENT-WS is provided, response is sent to this client only."
   "Run HANDLER every time REQUEST is received from browser.
 Return value of HANDLER is sent back to browser as response."
   (let ((cell (assoc request spookfox--req-handlers-alist #'string=)))
-    (when cell (error "Handler already registered. There can only by one handler per request"))
+    (when cell (warn "Handler already registered. Overwriting previously registered handler."))
     (push (cons request handler) spookfox--req-handlers-alist)))
 
 (provide 'spookfox-core)

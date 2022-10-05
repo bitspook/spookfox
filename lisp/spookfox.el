@@ -19,12 +19,17 @@
 ;;; Code:
 
 (require 'spookfox-core)
+(require 'spookfox-org-tabs)
 
-(defvar spookfox-version "0.2.0"
-  "Spookfox version.")
+(setf spookfox-available-apps `((org-tabs . ,#'spookfox--org-tabs-init)))
+(setf spookfox-enabled-apps '(org-tabs))
 
-(defconst spookfox-available-apps '(org-tabs))
-(defvar spookfox-enabled-apps '(org-tabs))
+(defun spookfox-init ()
+  "Initialize spookfox with enabled apps."
+  (dolist (app spookfox-enabled-apps)
+    (spookfox--enable-app app))
+
+  (spookfox-start-server))
 
 (provide 'spookfox)
 ;;; spookfox.el ends here

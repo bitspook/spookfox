@@ -7,11 +7,6 @@ Caution: Spookfox is in early development and I am making breaking changes all
 over the place.
 #+end_quote
 
-#+begin_quote
-*Windows is not supported right now.* At this stage I have only tested spookfox
-on Linux, but it should *theoretically* work with Mac as well.
-#+end_quote
-
 ** Features
 
 1. *Chained tabs*: use Emacs for tab management
@@ -60,7 +55,7 @@ on Linux, but it should *theoretically* work with Mac as well.
 4. Get active tab
 
   #+begin_src elisp
-  (sf--request-active-tab)
+  (spookfox--request-active-tab)
   #+end_src
 
   #+RESULTS:
@@ -86,23 +81,16 @@ There are 3 parts to install spookfox.
    repo.
 
    #+begin_src elisp
-     (straight-use-package
-      '(spookfox :type git :host github :repo "bitspook/spookfox" :file "spookfox.el"))
+     (use-package spookfox
+           :straight (spookfox :type git
+                               :host github
+                               :repo "bitspook/spookfox"
+                               :files ("lisp/*.el" "lisp/apps/*.el"))
+           :config
+           (setq spookfox-saved-tabs-target
+                 `(file+headline ,(expand-file-name "spookfox.org" org-directory) "Tabs"))
+           (spookfox-init))
    #+end_src
-
-   OR You can also simply clone this repo and use
-
-   #+begin_src elisp
-     (load-file "<path-to-spookfox>/spookfox.el")
-     (require 'spookfox)
-   #+end_src
-
-3. Use Emacs package to install =spookfox-native=, which is the glue code for
-   communication b/w Emacs and browser
-
-   Once spookfox.el is installed, you can call
-   src_elisp{spookfox-install-native} interactively (by pressing =M-x=) in Emacs
-   to install the final piece. *Note* this will only work on Linux.
 
 ** Configuration
 
@@ -116,24 +104,6 @@ Following variables are available to configure some aspects of spookfox.
    #+begin_src elisp
      (setq spookfox-saved-tabs-target `(file+headline ,(expand-file-name "spookfox.org" org-directory) "Tabs"))
    #+end_src
-
-2. =spookfox-max-reconnect-retry-interval=
-
-   Spookfox maintains a socket connection with the browser using browser
-   [[https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Native_messaging][native-messaging]]. This connection can sometimes break (e.g because browser
-   isn't open, extension isn't installed etc), to remedy which spookfox tries to
-   reconnect after an incrementing interval until a connection is established.
-   =spookfox-max-reconnect-retry-interval= is the maximum number of seconds
-   spookfox will wait between two retry attempts.
-
-   #+begin_src elisp
-     (setq spookfox-max-reconnect-retry-interval 30)
-   #+end_src
-
-3. =spookfox-native-installation-dir=
-
-   This is the directory in which spookfox will download and save
-   spookfox-native binary (from the [[https://github.com/bitspook/spookfox/releases/][releases page]]).
 
 ** Contribute
 

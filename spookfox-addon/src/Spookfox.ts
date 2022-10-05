@@ -1,11 +1,15 @@
 import produce, { Immutable } from 'immer';
 import { v4 as uuid } from 'uuid';
-import { gobbleErrorsOf } from '~src/lib';
+
+interface ErrorResPayload {
+  status: 'error';
+  message: string;
+}
 
 interface Response {
   type: 'response';
   requestId: string;
-  payload: any;
+  payload: ErrorResPayload | any;
 }
 
 interface Request {
@@ -30,10 +34,7 @@ export interface SFAppConstructor<S> {
  * For documentation and ease of refactoring.
  */
 export enum SFEvents {
-  // Emacs sends a CONNECTED request when it connects. Browser don't tell us
-  // when it is able to connect to the native app. I suppose it is implicit that
-  // if it doesn't disconnect, it connects
-  EMACS_CONNECTED = 'EMACS_CONNECTED',
+  CONNECTED = 'CONNECTED',
   DISCONNECTED = 'DISCONNECTED',
   // A request Emacs sent to do something or to provide some information
   REQUEST = 'REQUEST',
@@ -131,7 +132,7 @@ export class Spookfox extends EventTarget {
     this.ws = new WebSocket(this.wsUrl);
 
     this.ws.onopen = () => {
-      console.log('Connected to ws', this.wsUrl);
+      this.emit(SFEvents.CONNECTED);
     };
 
     this.ws.onclose = () => {
@@ -160,7 +161,12 @@ export class Spookfox extends EventTarget {
 
     this.ws.send(JSON.stringify(request));
 
-    return this.getResponse(request.id);
+    const res = await this.getResponse(request.id);
+    if (res.payload.status?.toLowerCase() === 'error') {
+      throw new Error(res.payload.message);
+    }
+
+    return res.payload;
   }
 
   /**
@@ -247,10 +253,10 @@ export class Spookfox extends EventTarget {
     // Emit a unique event per `requestId`. Shenanigans I opted for doing
     // to build a promise based interface on request/response dance needed
     // for communication with Emacs. Check `Spookfox.getResponse`
-    this.emit(res.requestId as SFEvents, res.payload);
+    this.emit(res.requestId as SFEvents, res);
   };
 
-  private getResponse = (requestId: string) => {
+  private getResponse = (requestId: string): Promise<Response> => {
     const maxWait = 5000;
 
     return new Promise((resolve, reject) => {

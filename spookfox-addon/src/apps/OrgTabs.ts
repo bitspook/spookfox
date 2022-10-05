@@ -1,6 +1,6 @@
 import { Draft, freeze, Immutable } from 'immer';
 import { SFApp, SFEvent, SFEvents, Spookfox } from '~src/Spookfox';
-import { gobbleErrorsOf, sleep } from '~src/lib';
+import { sleep } from '~src/lib';
 
 export type OrgTabsState = Immutable<{
   // All the tabs open in browser at any time. Assumption is that this list is
@@ -94,34 +94,19 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
   }
 
   constructor(public name: string, public sf: Spookfox) {
-    sf.addEventListener(
-      SFEvents.EMACS_CONNECTED,
-      gobbleErrorsOf(this.handleConnected)
-    );
-    browser.tabs.onCreated.addListener(gobbleErrorsOf(this.handleNewTab));
-    browser.tabs.onUpdated.addListener(gobbleErrorsOf(this.handleUpdateTab));
-    browser.tabs.onRemoved.addListener(gobbleErrorsOf(this.handleRemoveTab));
+    browser.tabs.onCreated.addListener(this.handleNewTab);
+    browser.tabs.onUpdated.addListener(this.handleUpdateTab);
+    browser.tabs.onRemoved.addListener(this.handleRemoveTab);
 
-    sf.registerReqHandler(
-      EmacsRequests.GET_ACTIVE_TAB,
-      gobbleErrorsOf(this.getActiveTab)
-    );
-    sf.registerReqHandler(
-      EmacsRequests.GET_ALL_TABS,
-      gobbleErrorsOf(this.getAllTabs)
-    );
-    sf.registerReqHandler(EmacsRequests.OPEN_TAB, gobbleErrorsOf(this.openTab));
-    sf.registerReqHandler(
-      EmacsRequests.OPEN_TABS,
-      gobbleErrorsOf(this.openTabs)
-    );
-    sf.registerReqHandler(
-      EmacsRequests.SEARCH_FOR,
-      gobbleErrorsOf(this.openSearchTab)
-    );
+    sf.registerReqHandler(EmacsRequests.GET_ACTIVE_TAB, this.getActiveTab);
+    sf.registerReqHandler(EmacsRequests.GET_ALL_TABS, this.getAllTabs);
+    sf.registerReqHandler(EmacsRequests.OPEN_TAB, this.openTab);
+    sf.registerReqHandler(EmacsRequests.OPEN_TABS, this.openTabs);
+    sf.registerReqHandler(EmacsRequests.SEARCH_FOR, this.openSearchTab);
     sf.addEventListener(SFEvents.NEW_STATE, this.syncChainIcon);
 
     this.addBrowserPageAction();
+    this.init();
   }
 
   addBrowserPageAction = () => {
@@ -157,7 +142,7 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
       }
     };
 
-    browser.pageAction.onClicked.addListener(gobbleErrorsOf(handlePageAction));
+    browser.pageAction.onClicked.addListener(handlePageAction);
   };
 
   // Ensure page-action icons (chained icon) for all tabs are always correct
@@ -392,10 +377,12 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
   };
 
   /**
-   * Initialize the state when Emacs first connects.
+   * Initialize the state.
    */
-  private handleConnected = async () => {
-    const savedTabs = (await this.sf.request('GET_SAVED_TABS')) as SavedTab[];
+  private init = async () => {
+    const savedTabs = (await this.sf.request(
+      EmacsRequests.GET_SAVED_TABS
+    )) as SavedTab[];
     const currentTabs = await browser.tabs.query({ windowId: 1 });
 
     // Problem: There might be tabs with same URLs
@@ -426,7 +413,7 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
       return accum;
     }, {});
 
-    this.dispatch(Actions.EMACS_RECONNECTED, {
+    this.dispatch(Actions.INIT, {
       openTabs,
       savedTabs: savedTabsMap,
     });
@@ -434,7 +421,7 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
 
   reducer({ name, payload }, state: Draft<OrgTabsState>) {
     switch (name) {
-      case Actions.EMACS_RECONNECTED: {
+      case Actions.INIT: {
         state.openTabs = payload.openTabs;
         state.savedTabs = payload.savedTabs;
         break;
@@ -489,7 +476,7 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
 }
 
 export enum Actions {
-  EMACS_RECONNECTED = 'EMACS_RECONNECTED',
+  INIT = 'INIT',
   SAVE_TAB_START = 'SAVE_TAB_START',
   SAVE_TAB_SUCCESS = 'SAVE_TAB_SUCCESS',
   SAVE_TAB_FAIL = 'SAVE_TAB_FAIL',
@@ -504,6 +491,7 @@ export enum Actions {
 
 export enum EmacsRequests {
   TOGGLE_TAB_CHAINING = 'TOGGLE_TAB_CHAINING',
+  GET_SAVED_TABS = 'GET_SAVED_TABS',
   GET_ACTIVE_TAB = 'GET_ACTIVE_TAB',
   GET_ALL_TABS = 'GET_ALL_TABS',
   OPEN_TAB = 'OPEN_TAB',
