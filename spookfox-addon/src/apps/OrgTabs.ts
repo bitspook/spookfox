@@ -1,6 +1,10 @@
 import { Draft, freeze, Immutable } from 'immer';
 import { SFApp, SFEvent, SFEvents, Spookfox } from '~src/Spookfox';
 import { sleep } from '~src/lib';
+import iconChainDark from '../icons/chained-dark.svg';
+import iconChainLight from '../icons/chained-light.svg';
+import iconUnchainDark from '../icons/unchained-dark.svg';
+import iconUnchainLight from '../icons/unchained-light.svg';
 
 export type OrgTabsState = Immutable<{
   // All the tabs open in browser at any time. Assumption is that this list is
@@ -156,17 +160,17 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
     tabs.forEach(async (tab) => {
       const openTab = state.openTabs[tab.id];
       const savedTab = state.savedTabs[openTab?.savedTabId];
-      let icon = `icons/unchained-${iconColor}.svg`;
+      let icon = iconColor === 'light' ? iconUnchainLight : iconUnchainDark;
 
       if (savedTab && savedTab.chained) {
-        icon = `icons/chained-${iconColor}.svg`;
+        icon = iconColor === 'light' ? iconChainLight : iconChainDark;
       }
 
       try {
         await browser.pageAction.setIcon({ tabId: tab.id, path: icon });
         browser.pageAction.show(tab.id);
       } catch (err) {
-        if (/invalid tab id/.test(err.message.toLowerCase())) {
+        if (/invalid tab id/i.test(err.message.toLowerCase())) {
           if (this.sf.debug) {
             console.warn(err);
           }
@@ -229,7 +233,7 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
           await browser.tabs.update(tab.browserTabId, { active: true });
           return null;
         } catch (err) {
-          if (/invalid tab id/.test(err.message.toLowerCase())) {
+          if (/invalid tab id/i.test(err.message.toLowerCase())) {
             this.dispatch(Actions.REMOVE_TAB_START, {
               tabId: tab.browserTabId,
             });

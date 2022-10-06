@@ -6,29 +6,25 @@
   "icons": {
     "48": "icons/chained-dark.svg"
   },
-
   "browser_specific_settings": {
     "gecko": {
       "id": "spookfox@bitspook.in",
       "strict_min_version": "70.0"
     }
   },
-
   "background": {
-    "scripts": ["./background.ts"]
+    "scripts": [
+      "./background.ts"
+    ]
   },
-
-  "page_action": {
-    "default_icon": "icons/unchained-light.svg",
-    "default_title": "Chain/Unchain with Spookfox"
+  "page_action": {},
+  "browser_action": {
+    "default_icon": "icons/sf-logo/logo-white.png",
+    "default_title": "Spookfox",
+    "default_popup": "popup/global.html"
   },
-
-  "web_accessible_resources": [
-    "icons/chained-light.svg",
-    "icons/chained-dark.svg",
-    "icons/unchained-light.svg",
-    "icons/unchained-dark.svg"
-  ],
-
-  "permissions": ["tabs", "search", "scripting"]
+  "permissions": [
+    "tabs",
+    "search"
+  ]
 }
