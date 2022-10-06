@@ -6,6 +6,9 @@
   --connecting: #a09000;
   --seperator: #646464;
   --dim-text: #c2c2c2;
+  --text: #ddd;
+  --link: #a36004;
+  --popup-height: 20em;
 }
 
 * {
@@ -16,10 +19,16 @@
 
 body {
   background: var(--bg);
+  color: var(--text);
   font-size: 10px;
   min-width: 20em;
-  min-height: 20em;
+  min-height: var(--popup-height);
   font-family: monospace;
+}
+
+a {
+  color: var(--link);
+  font-weight: bold;
 }
 
 .conn-status {
@@ -91,4 +100,13 @@ body {
 @keyframes rotate {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+.main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 15em;
+  width: 100%;
+  padding: 1em;
 }

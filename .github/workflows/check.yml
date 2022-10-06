@@ -17,8 +17,6 @@ jobs:
         with:
           node-version: '16.x'
 
-      - run: cargo check
-
       - run: yarn
         working-directory: spookfox-addon
 
