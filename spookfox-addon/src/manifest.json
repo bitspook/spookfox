@@ -19,12 +19,14 @@
   },
   "page_action": {},
   "browser_action": {
-    "default_icon": "icons/sf-logo/logo-white.png",
+    "default_icon": "icons/emacs-mono.svg",
     "default_title": "Spookfox",
     "default_popup": "popup/global.html"
   },
   "permissions": [
     "tabs",
     "search"
+  ],
+  "web_accessible_resources": [
   ]
 }

@@ -1,5 +1,7 @@
 import OrgTabs from './apps/OrgTabs';
-import { Spookfox } from './Spookfox';
+import { SFEvents, Spookfox } from './Spookfox';
+import iconEmacsMono from './icons/emacs-mono.svg';
+import iconEmacsColor from './icons/emacs-color.svg';
 
 const run = async () => {
   const sf = ((window as any).spookfox = new Spookfox());
@@ -13,6 +15,14 @@ const run = async () => {
       default:
         return { status: 'error', message: `Uknown app ${name}` };
     }
+  });
+
+  sf.addEventListener(SFEvents.CONNECTED, () => {
+    browser.browserAction.setIcon({ path: iconEmacsColor });
+  });
+
+  sf.addEventListener(SFEvents.DISCONNECTED, () => {
+    browser.browserAction.setIcon({ path: iconEmacsMono });
   });
 };
 
