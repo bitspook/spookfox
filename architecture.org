@@ -1,63 +1,24 @@
 #+title: Spookfox Software Architecture
 
-#+begin_quote
-*Best read in Emacs*. Github don't handle internal org-mode links very well,
- reading this document in Emacs itself will be a much nicer experience.
-#+end_quote
-
-
 Spookfox involves following major parts in terms of a tech stack.
 
 1. *spookfox.el*: Emacs package written in Emacs Lisp
 2. *spookfox-addon*: Firefox extension written in Javascript
-3. *spookfox-native*: Glue code written in Rust
 
-To make the browser extension talk to Emacs, Spookfox uses Native Messaging.
-[[https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Native_messaging][Native Messaging]] require an executable which accepts input from stdin, and
-provides its output at stdout. Emacs itself proved unusable for that purpose.
-That's why spookfox-native was written as glue code which allow communication
-b/w the browser and Emacs.
+To make the browser extension talk to Emacs, Spookfox uses Websockets. A
+websockets server is started in Emacs, to which browser addon then connects.
+Emacs itself proved unusable as a native-messaging client.
 
 * Level 0
 
-Low level communication between browser and Emacs in terms of IPC.
+Low level communication between browser and Emacs over websockets.
 
 ** Components
 
 Spookfox has 3 primary components:
 
-1. <<sn>> : spookfox-native : Glue code written in Rust
-2. <<sa>> : spookfox-addon : Firefox addon written in Javascript
-3. <<se>> : spookfox-el : Emacs package written in Emacs Lisp
-4. <<ss>> : spookfox-socket : A UNIX socket used for inter-process communication
-   (IPC) b/w [[se]] and [[sn]]
-
-4th is just a file (well socket, but you know what I mean).
-
-** [[Control Flow]]s
-
-
-- [[sa]] starts [[sn]] on browser startup.
-
-  [[sn]] is now a running process to which browser communicates via =stdin= and
-  =stdout=. Anything [[sn]] prints become a message [[sa]] receives and tries to
-  interpret as a command.
-
-*** Emacs sending commands to Firefox
-
-- [[sn]] spawns a thread which connects to [[ss]] for messages to/from Emacs
-- [[se]] connects to [[ss]]
-- Emacs receives input from User to execute a command in browser
-- [[se]] create a JSON string (referred to as =msg=) and sends it to [[ss]]
-- [[sn]] reads =msg= on [[ss]]
-- [[sn]] prints the =msg= as-is to stdout, to which [[sa]] is listening
-- [[sa]] receives =msg=
-  - parses it
-  - executes it
-  - post a response back to [[sn]]
-- [[sn]] receives the response from [[sa]] and passes it to [[ss]]
-- [[se]] now has the response (received over [[ss]]) of message it sent to browser
-
+1. <<sa>> : spookfox-addon : Firefox addon written in Javascript
+2. <<se>> : spookfox-el : Emacs package written in Emacs Lisp
 
 * Level 1
 
@@ -70,51 +31,10 @@ atop of Level 0.
 1. [[sa]]
 2. [[se]]
 
-** [[Control Flow]]s
-
-*** Reopening a saved tab
-
-- [[se]] make an =OPEN_TAB= request to [[sa]], and provide the saved tab (id, url etc)
-- [[sa]] checks if the requested tab is already open in browser
-  - If yes, it brings that tab to focus
-  - If not
-    - [[sa]] saves the requested tab in state as "a tab being reopened" (in
-      =state.reOpeningTabs=)
-    - [[sa]] creates a new tab
-    - New-tab event listener in [[sa]] starts when the new tab is created
-      - It dispatches =SAVE_TAB_START= to tell Spookfox that it is starting
-        saving a new tab
-      - It checks if the new tab being created is being reopened
-        - At this time, browser hasn't assigned a URL to the tab yet. The URL
-          with which browser was instructed to open the tab is put on as
-          =newTab.title= but =newTab.url= itself is =about:blank=. So the check
-          is done based on these
-      - If yes, it does nothing more, and let browser do its work
-    - Update-tab event listener in [[sa]] starts when browser assigns the url to the
-      tab
-      - It checks whether the url of this tab is in =state.reOpeningTabs=
-        - If yes, it completes the tab-saving process started in new-tab
-          listener by dispatching =SAVE_TAB_SUCCESS= action. This is when the
-          'reopening a saved tab' finishes.
-
 * Glossary
 
-- <<Packet>> :: *Not* a TCP/UDP packet. This is a single message transferred
-  across spookfox-native. It is named as such to emphasize the fact that this is
-  purely a transfer thing, and shouldn't contain any business knowledge. It only
-  has information about what is being transferred, if the transfer was
-  successful, and who is doing the transfer.
 - <<Request>> :: Analogous of a request in most protocols. This is a message one
   side sends to another, expecting it to do some operation and/or a response.
   Every request must have a unique ID.
-- <<Response>> :: Response to a request. Since [[request]] originates on one end
-  (e.g [[se]]) and handled at another end (e.g [[sa]]), every response contains an
-  =requestId= identifying which requests is being responded to.
-- <<Control Flow>> :: Documentation of how to achieve a certain result, which
-  part of the system executes first, and does what to make another part execute.
-
-  We aren't documenting all control flows. This documentation serve 2 purposes:
-
-  1. Document enough to build an intuition of how different components interact
-     together
-  2. Document complex control flows whose implementation might be confusing
+- <<Response>> :: Response to a request. Every response contains a =requestId=
+  identifying which requests is being responded to.

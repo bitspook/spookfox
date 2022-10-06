@@ -13,17 +13,9 @@ jobs:
     steps:
       - uses: actions/checkout@v1
 
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          components: clippy
-          target: x86_64-unknown-linux-musl
-
       - uses: actions/setup-node@v2
         with:
           node-version: '16.x'
-
-      - run: cargo check
 
       - run: yarn
         working-directory: spookfox-addon

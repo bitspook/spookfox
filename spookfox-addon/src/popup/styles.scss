@@ -1,0 +1,112 @@
+:root {
+  --bg: #323232;
+  --bg-contrasted: #535353;
+  --connected: #129912;
+  --disconnected: #991212;
+  --connecting: #a09000;
+  --seperator: #646464;
+  --dim-text: #c2c2c2;
+  --text: #ddd;
+  --link: #a36004;
+  --popup-height: 20em;
+}
+
+* {
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-size: 10px;
+  min-width: 20em;
+  min-height: var(--popup-height);
+  font-family: monospace;
+}
+
+a {
+  color: var(--link);
+  font-weight: bold;
+}
+
+.conn-status {
+  background: var(--bg-contrasted);
+  font-family: monospace;
+  line-height: 1;
+  color: var(--dim-text);
+  width: 100%;
+  padding: 1em;
+  display: flex;
+  border-bottom: 1px solid var(--seperator);
+  align-items: center;
+
+  .status {
+    flex-grow: 1;
+    display: flex;
+  }
+}
+
+.conn-dot {
+  width: 1em;
+  height: 1em;
+  border-radius: 50%;
+  margin-right: 0.5em;
+}
+
+.connected {
+  @extend .conn-dot;
+  background-color: var(--connected);
+}
+
+.connecting {
+  @extend .conn-dot;
+  background-color: var(--connecting);
+}
+
+.disconnected {
+  @extend .conn-dot;
+  background-color: var(--disconnected);
+}
+
+.buttons {
+  align-self: flex-end;
+
+  button {
+    border: none;
+  }
+
+  .reconnect {
+    width: 1em;
+    height: 1em;
+    background: url('../icons/refresh-light.svg');
+    cursor: pointer;
+
+    &:hover {
+      background: url('../icons/refresh-light--active.svg');
+    }
+
+    &:active {
+      background: url('../icons/refresh-light.svg');
+    }
+  }
+}
+
+.rotating {
+  animation: rotate 2s infinite linear;
+}
+
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 15em;
+  width: 100%;
+  padding: 1em;
+}

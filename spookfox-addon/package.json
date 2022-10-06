@@ -1,10 +1,10 @@
 {
   "name": "spookfox",
-  "version": "0.1.13",
+  "version": "0.2.0",
   "license": "GPLv3",
   "scripts": {
-    "start": "parcel serve src/manifest.json",
-    "build": "parcel build src/manifest.json",
+    "start": "parcel serve src/manifest.json 'src/apps/*.ts'",
+    "build": "parcel build src/manifest.json 'src/apps/*.ts'",
     "lint": "eslint src/ && tsc --noEmit",
     "publish-addon": "yarn build && web-ext sign --channel=unlisted -s ./dist -a ./dist/addons --api-key $FIREFOX_ADDON_KEY --api-secret $FIREFOX_ADDON_SECRET"
   },

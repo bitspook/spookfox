@@ -1,84 +1,37 @@
-import OrgTabs, {
-  Actions,
-  fromBrowserTab,
-  OrgTabsState,
-  SavedTab,
-} from './apps/OrgTabs';
-import { gobbleErrorsOf } from './lib';
-import { Spookfox, SFEvent, SFEvents } from './Spookfox';
+import OrgTabs from './apps/OrgTabs';
+import { SFEvents, Spookfox } from './Spookfox';
+// eslint-disable-next-line
+import iconEmacsMono from './icons/emacs-mono.svg';
+import iconEmacsColor from './icons/emacs-color.svg';
 
 const run = async () => {
-  const sf = ((window as any).sf = new Spookfox());
+  const sf = ((window as any).spookfox = new Spookfox());
 
-  sf.registerApp('orgTabs', OrgTabs);
-
-  const handleNewState = async (e: SFEvent) => {
-    const tabs = await browser.tabs.query({ windowId: 1 });
-    const iconColor = window.matchMedia('(prefers-color-scheme: dark)').matches
-      ? 'light'
-      : 'dark';
-    const state: OrgTabsState = e.payload.orgTabs;
-
-    tabs.forEach(async (tab) => {
-      const openTab = state.openTabs[tab.id];
-      const savedTab = state.savedTabs[openTab?.savedTabId];
-      let icon = `icons/unchained-${iconColor}.svg`;
-
-      if (savedTab && savedTab.chained) {
-        icon = `icons/chained-${iconColor}.svg`;
+  sf.registerReqHandler('ENABLE_APP', (name: string) => {
+    switch (name) {
+      case 'org-tabs': {
+        sf.registerApp('org-tabs', OrgTabs);
+        return { status: 'ok' };
       }
-
-      try {
-        await browser.pageAction.setIcon({ tabId: tab.id, path: icon });
-        browser.pageAction.show(tab.id);
-      } catch (err) {
-        if (/invalid tab id/.test(err.message.toLowerCase())) {
-          // pass. Tab has been deleted somehow, e.g Firefox containers do this
-          // rapid tab open/close dance
-          return;
-        }
-
-        console.warn(
-          `Error occurred while setting pageAction icon. [err=${err}]`
-        );
-      }
-    });
-  };
-
-  // Ensure page-action icons (chained icon) for all tabs are always correct
-  sf.addEventListener(SFEvents.NEW_STATE, gobbleErrorsOf(handleNewState));
-
-  const handlePageAction = async (t: browser.tabs.Tab) => {
-    const state = (sf.state as any).orgTabs as OrgTabsState;
-    const openedTab = state.openTabs[t.id];
-    const localSavedTab = state.savedTabs[openedTab?.savedTabId] || {};
-    const app = sf.apps.orgTabs as OrgTabs;
-    app.dispatch(Actions.SAVE_TAB_START, openedTab?.browserTabId);
-
-    try {
-      const savedTab = (await sf.request(
-        'TOGGLE_TAB_CHAINING',
-        fromBrowserTab({
-          ...t,
-          ...localSavedTab,
-          ...openedTab,
-        })
-      )) as SavedTab;
-      // FIXME This should be a part of OrgTabs app
-      (sf.apps.orgTabs as OrgTabs).dispatch(Actions.SAVE_TAB_SUCCESS, {
-        savedTab,
-        openedTab,
-      });
-    } catch (error) {
-      console.error(`Error during page-action. [err=${error}]`);
-      (sf.apps.orgTabs as OrgTabs).dispatch(Actions.SAVE_TAB_FAIL, {
-        openedTab,
-        error,
-      });
+      default:
+        return { status: 'error', message: `Uknown app ${name}` };
     }
-  };
+  });
 
-  browser.pageAction.onClicked.addListener(gobbleErrorsOf(handlePageAction));
+  let autoConnectInterval = null;
+  sf.addEventListener(SFEvents.CONNECTED, () => {
+    browser.browserAction.setIcon({ path: iconEmacsColor });
+
+    if (autoConnectInterval) clearInterval(autoConnectInterval);
+  });
+
+  sf.addEventListener(SFEvents.DISCONNECTED, () => {
+    browser.browserAction.setIcon({ path: iconEmacsMono });
+
+    autoConnectInterval = setInterval(() => {
+      sf.reConnect();
+    }, 5000);
+  });
 };
 
 run().catch((err) => {

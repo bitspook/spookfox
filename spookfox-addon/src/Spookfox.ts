@@ -1,17 +1,22 @@
 import produce, { Immutable } from 'immer';
 import { v4 as uuid } from 'uuid';
-import { gobbleErrorsOf } from '~src/lib';
-import setupBroker from './broker';
+
+interface ErrorResPayload {
+  status: 'error';
+  message: string;
+}
 
 interface Response {
+  type: 'response';
   requestId: string;
-  payload: any;
+  payload: ErrorResPayload | any;
 }
 
 interface Request {
   id: string;
   name: string;
   payload: any;
+  type: 'request';
 }
 
 export interface SFApp<S> {
@@ -29,10 +34,8 @@ export interface SFAppConstructor<S> {
  * For documentation and ease of refactoring.
  */
 export enum SFEvents {
-  // Emacs sends a CONNECTED request when it connects. Browser don't tell
-  // us when it is able to connect to the native app. I suppose it is implicit
-  // that if it don't disconnects, it connects. Sounds like ancient wisdom.
-  EMACS_CONNECTED = 'EMACS_CONNECTED',
+  CONNECTED = 'CONNECTED',
+  CONNECTING = 'CONNECTING',
   DISCONNECTED = 'DISCONNECTED',
   // A request Emacs sent to do something or to provide some information
   REQUEST = 'REQUEST',
@@ -51,54 +54,55 @@ export class SFEvent<P = any> extends Event {
   }
 }
 
+enum LogLevel {
+  Error = 0,
+  Info = 1,
+  Debug = 2,
+}
+
 /**
  * `Spookfox` is the heart of this addon.
+ *
  * # Usage
- * 1. Keep a single Spookfox instance. Spookfox will create its own `browser.runtime.port.Port`
- * ```
- * const sf = new Spookfox();
- * ```
- * 2. Create a `browser.runtime.port.Port` if you want multiple Spookfox instances around.
- * e.g for multiple windows?
- * ```
- * const port = browser.runtime.connectNative('spookfox');
- * const sf = new Spookfox(port);
- * ```
+ *
+ *   ```js
+ *   const sf = new Spookfox();
+ *   ```
+ *
  * # Events
+ *
  * It emits `SFEvents`. `SFEvents.REQUEST` and `SFEvents.RESPONSE` don't
  * need to be handled manually. `Spookfox.request` and `Spookfox.registerReqHandler`
  * should be sufficient for most cases.
  */
-// It extends `EventTarget` so we can have the ability to emit and listen to
-// custom events. We rely on custom events to build independent modules, while
+// Extends `EventTarget` so we can have the ability to emit and listen to custom
+// events. We rely on custom events to build independent modules, while
 // providing a unified interface.
 export class Spookfox extends EventTarget {
   state = {};
   reqHandlers = {};
   // This is needed only for re-init hack
   eventListeners = [];
-  debug: boolean;
+  debugLevel: LogLevel;
   apps: { [name: string]: SFApp<any> } = {};
+  wsUrl = 'ws://localhost:59001';
+  ws: WebSocket;
+  reConnecting = false;
 
-  constructor(public port?: browser.runtime.Port) {
+  constructor() {
     super();
-    if (!port) {
-      this.port = this.reConnect();
-    }
-    this.debug = Boolean(localStorage.getItem('SPOOKFOX_DEBUG'));
-    setupBroker(this);
+    this.ws = this.reConnect();
     this.setupEventListeners();
   }
 
-  private reInit() {
-    this.port = this.reConnect();
+  get isConnected() {
+    return this.ws.readyState === this.ws.OPEN;
+  }
 
-    for (const l of this.eventListeners) {
-      this.removeEventListener(l.type, l.callback);
-      super.addEventListener(l.type, l.callback);
-    }
-
-    setupBroker(this);
+  get logLevel(): LogLevel {
+    return (
+      parseInt(localStorage.getItem('SPOOKFOX_DEBUG'), 10) || LogLevel.Error
+    );
   }
 
   addEventListener(
@@ -120,21 +124,46 @@ export class Spookfox extends EventTarget {
   }
 
   private setupEventListeners() {
-    this.addEventListener(SFEvents.REQUEST, gobbleErrorsOf(this.handleRequest));
-    this.addEventListener(
-      SFEvents.RESPONSE,
-      gobbleErrorsOf(this.handleResponse)
-    );
-    this.addEventListener(
-      SFEvents.DISCONNECTED,
-      gobbleErrorsOf(this.handleDisconnected)
-    );
+    this.addEventListener(SFEvents.REQUEST, this.handleRequest);
+    this.addEventListener(SFEvents.RESPONSE, this.handleResponse);
   }
 
-  private reConnect() {
-    if (this.port) this.port.disconnect();
+  private async handleServerMsg(event: MessageEvent<string>) {
+    try {
+      const msg = JSON.parse(event.data);
 
-    return browser.runtime.connectNative('spookfox');
+      if (msg.name) {
+        return this.emit(SFEvents.REQUEST, msg);
+      }
+
+      return this.emit(SFEvents.RESPONSE, msg);
+    } catch (err) {
+      console.error(`Bad ws message [err=${err}, msg=${event.data}]`);
+    }
+  }
+
+  reConnect() {
+    if (this.ws) {
+      this.ws.close();
+      this.reConnecting = true;
+    }
+
+    if (!this.reConnecting) this.emit(SFEvents.CONNECTING);
+    this.ws = new WebSocket(this.wsUrl);
+
+    this.ws.onopen = () => {
+      this.emit(SFEvents.CONNECTED);
+    };
+
+    this.ws.onclose = () => {
+      this.emit(SFEvents.DISCONNECTED);
+      if (this.reConnecting) this.emit(SFEvents.CONNECTING);
+      this.reConnecting = false;
+    };
+
+    this.ws.onmessage = this.handleServerMsg.bind(this);
+
+    return this.ws;
   }
 
   /**
@@ -152,16 +181,27 @@ export class Spookfox extends EventTarget {
       payload,
     };
 
-    this.port.postMessage(request);
+    this.ws.send(JSON.stringify(request));
 
-    return this.getResponse(request.id);
+    const res = await this.getResponse(request.id);
+    if (res.payload.status?.toLowerCase() === 'error') {
+      throw new Error(res.payload.message);
+    }
+
+    return res.payload;
   }
 
   /**
    * A convenience function for emitting new events to `Spookfox`.
    */
   emit(name: SFEvents, payload?: object) {
-    this.dispatchEvent(new SFEvent(name, payload));
+    const event = new SFEvent(name, payload);
+
+    if (this.logLevel >= LogLevel.Debug) {
+      console.log('Emitting', event);
+    }
+
+    this.dispatchEvent(event);
   }
 
   /**
@@ -177,18 +217,19 @@ export class Spookfox extends EventTarget {
     name: string,
     handler: (payload: any, sf: Spookfox) => object
   ) {
-    if (this.reqHandlers[name]) {
-      throw new Error(
-        `Handler already registered. There can only by one handler per request. [request=${name}]`
-      );
+    if (this.reqHandlers[name] && this.logLevel) {
+      console.warn(`Overwriting handler for: ${name}`);
     }
 
-    this.reqHandlers[name] = handler;
+    this.reqHandlers[name.toUpperCase()] = handler;
   }
 
   registerApp<S>(name: string, App: SFAppConstructor<S>) {
+    if (this.apps[name]) return;
     this.apps[name] = new App(name, this);
-    this.state[name] = this.apps[name].initialState;
+    this.state = produce(this.state, (state) => {
+      state[name] = this.apps[name].initialState;
+    });
   }
 
   /**
@@ -201,7 +242,7 @@ export class Spookfox extends EventTarget {
    * sf.newState(newState, 'X kind of change.');
    * ```
    */
-  private newState(s: any) {
+  private replaceState(s: any) {
     this.state = s;
     this.emit(SFEvents.NEW_STATE, s);
   }
@@ -211,7 +252,8 @@ export class Spookfox extends EventTarget {
    */
   private handleRequest = async (e: SFEvent<Request>) => {
     const request = e.payload;
-    const executioner = this.reqHandlers[request.name];
+
+    const executioner = this.reqHandlers[request.name.toUpperCase()];
 
     if (!executioner) {
       console.warn('No handler for request', { request });
@@ -219,10 +261,12 @@ export class Spookfox extends EventTarget {
     }
     const response = await executioner(request.payload, this);
 
-    return this.port.postMessage({
-      requestId: request.id,
-      payload: response,
-    });
+    return this.ws.send(
+      JSON.stringify({
+        id: request.id,
+        payload: response,
+      })
+    );
   };
 
   /**
@@ -232,16 +276,16 @@ export class Spookfox extends EventTarget {
     const res = e.payload;
 
     if (!res.requestId) {
-      throw new Error(`Invalid response: [res=${res}]`);
+      throw new Error(`Invalid response: [res=${JSON.stringify(res)}]`);
     }
 
     // Emit a unique event per `requestId`. Shenanigans I opted for doing
     // to build a promise based interface on request/response dance needed
     // for communication with Emacs. Check `Spookfox.getResponse`
-    this.emit(res.requestId as SFEvents, res.payload);
+    this.emit(res.requestId as SFEvents, res);
   };
 
-  private getResponse = (requestId: string) => {
+  private getResponse = (requestId: string): Promise<Response> => {
     const maxWait = 5000;
 
     return new Promise((resolve, reject) => {
@@ -263,14 +307,7 @@ export class Spookfox extends EventTarget {
     });
   };
 
-  /**
-   * Handle disconnection from spookfox.
-   */
-  private handleDisconnected = async (event?: SFEvent) => {
-    console.warn('Spookfox disconnected.', { event });
-  };
-
-  private rootReducer({ name, payload }: Action, state: any): any {
+  private rootReducer({ name, payload }: Action): any {
     const [appName, actionName] = name.split('/');
 
     if (!appName || !actionName) {
@@ -279,7 +316,7 @@ export class Spookfox extends EventTarget {
       );
     }
 
-    if (this.debug) {
+    if (this.logLevel) {
       console.groupCollapsed(name);
       console.log('Payload', payload);
     }
@@ -299,7 +336,7 @@ export class Spookfox extends EventTarget {
       );
     });
 
-    if (this.debug) {
+    if (this.logLevel) {
       console.log('Next state', nextState);
       console.groupEnd();
     }
@@ -311,16 +348,12 @@ export class Spookfox extends EventTarget {
     // Need to manually do the error handling here because Firefox is eating
     // these errors up and not showing them in addon's console
     try {
-      const newState = this.rootReducer({ name, payload }, this.state);
-      this.newState(newState);
+      const newState = this.rootReducer({ name, payload });
+      this.replaceState(newState);
     } catch (err) {
       console.error('Error during dispatching action, [err=', err, ']');
     }
   }
-}
-
-export enum EmacsRequests {
-  TOGGLE_TAB_CHAINING = 'TOGGLE_TAB_CHAINING',
 }
 
 interface Action {

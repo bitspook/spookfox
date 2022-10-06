@@ -1,6 +1,10 @@
 import { Draft, freeze, Immutable } from 'immer';
-import { SFApp, SFEvents, Spookfox } from '~src/Spookfox';
-import { gobbleErrorsOf, sleep } from '~src/lib';
+import { SFApp, SFEvent, SFEvents, Spookfox } from '~src/Spookfox';
+import { sleep } from '~src/lib';
+import iconChainDark from '../icons/chained-dark.svg';
+import iconChainLight from '../icons/chained-light.svg';
+import iconUnchainDark from '../icons/unchained-dark.svg';
+import iconUnchainLight from '../icons/unchained-light.svg';
 
 export type OrgTabsState = Immutable<{
   // All the tabs open in browser at any time. Assumption is that this list is
@@ -94,35 +98,93 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
   }
 
   constructor(public name: string, public sf: Spookfox) {
-    this.name = name;
-    this.sf = sf;
+    browser.tabs.onCreated.addListener(this.handleNewTab);
+    browser.tabs.onUpdated.addListener(this.handleUpdateTab);
+    browser.tabs.onRemoved.addListener(this.handleRemoveTab);
 
-    sf.addEventListener(
-      SFEvents.EMACS_CONNECTED,
-      gobbleErrorsOf(this.handleConnected)
-    );
-    browser.tabs.onCreated.addListener(gobbleErrorsOf(this.handleNewTab));
-    browser.tabs.onUpdated.addListener(gobbleErrorsOf(this.handleUpdateTab));
-    browser.tabs.onRemoved.addListener(gobbleErrorsOf(this.handleRemoveTab));
+    sf.registerReqHandler(EmacsRequests.GET_ACTIVE_TAB, this.getActiveTab);
+    sf.registerReqHandler(EmacsRequests.GET_ALL_TABS, this.getAllTabs);
+    sf.registerReqHandler(EmacsRequests.OPEN_TAB, this.openTab);
+    sf.registerReqHandler(EmacsRequests.OPEN_TABS, this.openTabs);
+    sf.registerReqHandler(EmacsRequests.SEARCH_FOR, this.openSearchTab);
+    sf.addEventListener(SFEvents.NEW_STATE, this.syncChainIcon);
 
-    sf.registerReqHandler(
-      EmacsRequests.GET_ACTIVE_TAB,
-      gobbleErrorsOf(this.getActiveTab)
-    );
-    sf.registerReqHandler(
-      EmacsRequests.GET_ALL_TABS,
-      gobbleErrorsOf(this.getAllTabs)
-    );
-    sf.registerReqHandler(EmacsRequests.OPEN_TAB, gobbleErrorsOf(this.openTab));
-    sf.registerReqHandler(
-      EmacsRequests.OPEN_TABS,
-      gobbleErrorsOf(this.openTabs)
-    );
-    sf.registerReqHandler(
-      EmacsRequests.SEARCH_FOR,
-      gobbleErrorsOf(this.openSearchTab)
-    );
+    this.addBrowserPageAction();
+    this.init();
   }
+
+  addBrowserPageAction = () => {
+    const sf = this.sf;
+
+    const handlePageAction = async (t: browser.tabs.Tab) => {
+      const state = (sf.state as any)[this.name] as OrgTabsState;
+      const openedTab = state.openTabs[t.id];
+      const localSavedTab = state.savedTabs[openedTab?.savedTabId] || {};
+      const app = sf.apps[this.name] as OrgTabs;
+      app.dispatch(Actions.SAVE_TAB_START, openedTab?.browserTabId);
+
+      try {
+        const savedTab = (await sf.request(
+          'TOGGLE_TAB_CHAINING',
+          fromBrowserTab({
+            ...t,
+            ...localSavedTab,
+            ...openedTab,
+          })
+        )) as SavedTab;
+        // FIXME This should be a part of OrgTabs app
+        (sf.apps[this.name] as OrgTabs).dispatch(Actions.SAVE_TAB_SUCCESS, {
+          savedTab,
+          openedTab,
+        });
+      } catch (error) {
+        console.error(`Error during page-action. [err=${error}]`);
+        (sf.apps[this.name] as OrgTabs).dispatch(Actions.SAVE_TAB_FAIL, {
+          openedTab,
+          error,
+        });
+      }
+    };
+
+    browser.pageAction.onClicked.addListener(handlePageAction);
+  };
+
+  // Ensure page-action icons (chained icon) for all tabs are always correct
+  syncChainIcon = async (e: SFEvent) => {
+    const tabs = await browser.tabs.query({ windowId: 1 });
+    const iconColor = window.matchMedia('(prefers-color-scheme: dark)').matches
+      ? 'light'
+      : 'dark';
+    const state: OrgTabsState = e.payload[this.name];
+
+    tabs.forEach(async (tab) => {
+      const openTab = state.openTabs[tab.id];
+      const savedTab = state.savedTabs[openTab?.savedTabId];
+      let icon = iconColor === 'light' ? iconUnchainLight : iconUnchainDark;
+
+      if (savedTab && savedTab.chained) {
+        icon = iconColor === 'light' ? iconChainLight : iconChainDark;
+      }
+
+      try {
+        await browser.pageAction.setIcon({ tabId: tab.id, path: icon });
+        browser.pageAction.show(tab.id);
+      } catch (err) {
+        if (/invalid tab id/i.test(err.message.toLowerCase())) {
+          if (this.sf.logLevel) {
+            console.warn(err);
+          }
+          // pass. Tab has been deleted somehow, e.g Firefox containers do this
+          // rapid tab open/close dance
+          return;
+        }
+
+        console.warn(
+          `Error occurred while setting pageAction icon. [err=${err}]`
+        );
+      }
+    });
+  };
 
   /**
    * Get the active tab of first browser window. Let's not go in the nuances of
@@ -171,7 +233,7 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
           await browser.tabs.update(tab.browserTabId, { active: true });
           return null;
         } catch (err) {
-          if (/invalid tab id/.test(err.message.toLowerCase())) {
+          if (/invalid tab id/i.test(err.message.toLowerCase())) {
             this.dispatch(Actions.REMOVE_TAB_START, {
               tabId: tab.browserTabId,
             });
@@ -322,10 +384,12 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
   };
 
   /**
-   * Initialize the state when Emacs first connects.
+   * Initialize the state.
    */
-  private handleConnected = async () => {
-    const savedTabs = (await this.sf.request('GET_SAVED_TABS')) as SavedTab[];
+  private init = async () => {
+    const savedTabs = (await this.sf.request(
+      EmacsRequests.GET_SAVED_TABS
+    )) as SavedTab[];
     const currentTabs = await browser.tabs.query({ windowId: 1 });
 
     // Problem: There might be tabs with same URLs
@@ -356,7 +420,7 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
       return accum;
     }, {});
 
-    this.dispatch(Actions.EMACS_RECONNECTED, {
+    this.dispatch(Actions.INIT, {
       openTabs,
       savedTabs: savedTabsMap,
     });
@@ -364,7 +428,7 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
 
   reducer({ name, payload }, state: Draft<OrgTabsState>) {
     switch (name) {
-      case Actions.EMACS_RECONNECTED: {
+      case Actions.INIT: {
         state.openTabs = payload.openTabs;
         state.savedTabs = payload.savedTabs;
         break;
@@ -376,7 +440,10 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
 
       case Actions.SAVE_TAB_SUCCESS: {
         state.savedTabs[payload.savedTab.id] = payload.savedTab;
-        state.openTabs[payload.openedTab.browserTabId] = payload.openedTab;
+        state.openTabs[payload.openedTab.browserTabId] = {
+          ...payload.openedTab,
+          savedTabId: payload.savedTab.id,
+        };
         state.savingTabs = state.savingTabs.filter(
           (id) => id !== payload.openedTab.browserTabId
         );
@@ -419,7 +486,7 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
 }
 
 export enum Actions {
-  EMACS_RECONNECTED = 'EMACS_RECONNECTED',
+  INIT = 'INIT',
   SAVE_TAB_START = 'SAVE_TAB_START',
   SAVE_TAB_SUCCESS = 'SAVE_TAB_SUCCESS',
   SAVE_TAB_FAIL = 'SAVE_TAB_FAIL',
@@ -434,6 +501,7 @@ export enum Actions {
 
 export enum EmacsRequests {
   TOGGLE_TAB_CHAINING = 'TOGGLE_TAB_CHAINING',
+  GET_SAVED_TABS = 'GET_SAVED_TABS',
   GET_ACTIVE_TAB = 'GET_ACTIVE_TAB',
   GET_ALL_TABS = 'GET_ALL_TABS',
   OPEN_TAB = 'OPEN_TAB',
