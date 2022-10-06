@@ -225,6 +225,7 @@ export class Spookfox extends EventTarget {
   }
 
   registerApp<S>(name: string, App: SFAppConstructor<S>) {
+    if (this.apps[name]) return;
     this.apps[name] = new App(name, this);
     this.state = produce(this.state, (state) => {
       state[name] = this.apps[name].initialState;
