@@ -6,7 +6,7 @@ lint:
 
 yarn_version := $(shell cat spookfox-addon/package.json | grep -o '"version": ".*"' | tr -d '[:blank:]"' | cut -d ':' -f 2)
 addon_version := $(shell cat spookfox-addon/src/manifest.json | grep -o '"version": ".*"' | tr -d '[:blank:]"' | cut -d ':' -f 2)
-el_version := $(shell cat elisp/spookfox.el | grep 'defvar.*version' | grep -o '[0-9\.]*')
+el_version := $(shell cat lisp/spookfox.el | grep 'defvar.*version' | grep -o '[0-9\.]*')
 
 master_version := $(shell git show master:spookfox-addon/package.json | grep 'version' | grep -o '"[0-9\.]*"')
 
@@ -27,8 +27,9 @@ ifeq ($(VERSION),)
 endif
 		sed -i '/"version".*/s/"[0-9\.]*"/"$(VERSION)"/' spookfox-addon/package.json
 		sed -i '/"version".*/s/"[0-9\.]*"/"$(VERSION)"/' spookfox-addon/src/manifest.json
-		sed -i '/defvar.*version.*/s/"[0-9\.]*"/"$(VERSION)"/' spookfox.el
-		git add spookfox-addon/package.json spookfox-addon/src/manifest.json spookfox-native/Cargo.toml spookfox.el
+		sed -i '/defvar.*version.*/s/"[0-9\.]*"/"$(VERSION)"/' lisp/spookfox.el
+		sed -i '/Version/s/[0-9]\.[0-9]\.[0-9]/$(VERSION)/g' lisp/spookfox.el
+		git add spookfox-addon/package.json spookfox-addon/src/manifest.json lisp/spookfox.el
 		git commit -m 'Version bump to $(VERSION)'
 		git tag -a v$(VERSION) -m "Version $(VERSION)"
 		@echo "Version set to: ${VERSION}"
