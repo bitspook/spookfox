@@ -4,7 +4,6 @@
 ;; Access, save and manipulate browser tabs
 
 ;;; Code:
-(require 'spookfox-core)
 (require 'org)
 (require 'org-id)
 (require 'cl-lib)
