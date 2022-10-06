@@ -1,5 +1,6 @@
 import OrgTabs from './apps/OrgTabs';
 import { SFEvents, Spookfox } from './Spookfox';
+// eslint-disable-next-line
 import iconEmacsMono from './icons/emacs-mono.svg';
 import iconEmacsColor from './icons/emacs-color.svg';
 
