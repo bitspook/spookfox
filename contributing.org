@@ -64,15 +64,18 @@ This is how I install it in [[https://github.com/bitspook/spookmax.d/][my config
 
   In Firefox go to [[about:addons]], click /Gear Icon > Debug Addons > Inspect(in
   Spookfox box)/. This will open a developer console where you can see messages
-  logged by the addon. There is also a global variable =sf= (instance of
+  logged by the addon. There is also a global variable =spookfox= (instance of
   =Spookfox= class) available which you can play with.
 
 - Log state-changing events
 
-  Mutable state proves to be the issue behind a lot of bugs. If you find
-  yourself in position where you want to troubleshoot a bug, set
-  =SPOOKFOX_DEBUG= to a truth-y value in =localStorage= i.e
+  To see various levels of logged messages, please set =SPOOKFOX_DEBUG= to a
+  number b/w 0 and 2 in =localStorage= i.e
 
   #+begin_src js
     localStorage.setItem('SPOOKFOX_DEBUG', 1)
   #+end_src
+
+  0 -> Log errors
+  1 -> Log information
+  2 -> Log for debugging

@@ -171,7 +171,7 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
         browser.pageAction.show(tab.id);
       } catch (err) {
         if (/invalid tab id/i.test(err.message.toLowerCase())) {
-          if (this.sf.debug) {
+          if (this.sf.logLevel) {
             console.warn(err);
           }
           // pass. Tab has been deleted somehow, e.g Firefox containers do this

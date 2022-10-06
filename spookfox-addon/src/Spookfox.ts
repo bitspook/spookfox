@@ -35,6 +35,7 @@ export interface SFAppConstructor<S> {
  */
 export enum SFEvents {
   CONNECTED = 'CONNECTED',
+  CONNECTING = 'CONNECTING',
   DISCONNECTED = 'DISCONNECTED',
   // A request Emacs sent to do something or to provide some information
   REQUEST = 'REQUEST',
@@ -51,6 +52,12 @@ export class SFEvent<P = any> extends Event {
   constructor(public name: string, public payload?: P) {
     super(name);
   }
+}
+
+enum LogLevel {
+  Error = 0,
+  Info = 1,
+  Debug = 2,
 }
 
 /**
@@ -76,16 +83,26 @@ export class Spookfox extends EventTarget {
   reqHandlers = {};
   // This is needed only for re-init hack
   eventListeners = [];
-  debug: boolean;
+  debugLevel: LogLevel;
   apps: { [name: string]: SFApp<any> } = {};
   wsUrl = 'ws://localhost:59001';
   ws: WebSocket;
+  reConnecting = false;
 
   constructor() {
     super();
-    this.ws = this.connect();
-    this.debug = Boolean(localStorage.getItem('SPOOKFOX_DEBUG'));
+    this.ws = this.reConnect();
     this.setupEventListeners();
+  }
+
+  get isConnected() {
+    return this.ws.readyState === this.ws.OPEN;
+  }
+
+  get logLevel(): LogLevel {
+    return (
+      parseInt(localStorage.getItem('SPOOKFOX_DEBUG'), 10) || LogLevel.Error
+    );
   }
 
   addEventListener(
@@ -109,7 +126,6 @@ export class Spookfox extends EventTarget {
   private setupEventListeners() {
     this.addEventListener(SFEvents.REQUEST, this.handleRequest);
     this.addEventListener(SFEvents.RESPONSE, this.handleResponse);
-    this.addEventListener(SFEvents.DISCONNECTED, this.handleDisconnected);
   }
 
   private async handleServerMsg(event: MessageEvent<string>) {
@@ -126,9 +142,13 @@ export class Spookfox extends EventTarget {
     }
   }
 
-  private connect() {
-    if (this.ws) this.ws.close();
+  private reConnect() {
+    if (this.ws) {
+      this.ws.close();
+      this.reConnecting = true;
+    }
 
+    if (!this.reConnecting) this.emit(SFEvents.CONNECTING);
     this.ws = new WebSocket(this.wsUrl);
 
     this.ws.onopen = () => {
@@ -137,6 +157,8 @@ export class Spookfox extends EventTarget {
 
     this.ws.onclose = () => {
       this.emit(SFEvents.DISCONNECTED);
+      if (this.reConnecting) this.emit(SFEvents.CONNECTING);
+      this.reConnecting = false;
     };
 
     this.ws.onmessage = this.handleServerMsg.bind(this);
@@ -173,7 +195,13 @@ export class Spookfox extends EventTarget {
    * A convenience function for emitting new events to `Spookfox`.
    */
   emit(name: SFEvents, payload?: object) {
-    this.dispatchEvent(new SFEvent(name, payload));
+    const event = new SFEvent(name, payload);
+
+    if (this.logLevel >= LogLevel.Debug) {
+      console.log('Emitting', event);
+    }
+
+    this.dispatchEvent(event);
   }
 
   /**
@@ -189,10 +217,8 @@ export class Spookfox extends EventTarget {
     name: string,
     handler: (payload: any, sf: Spookfox) => object
   ) {
-    if (this.reqHandlers[name]) {
-      throw new Error(
-        `Handler already registered. There can only by one handler per request. [request=${name}]`
-      );
+    if (this.reqHandlers[name] && this.logLevel) {
+      console.warn(`Overwriting handler for: ${name}`);
     }
 
     this.reqHandlers[name.toUpperCase()] = handler;
@@ -200,7 +226,9 @@ export class Spookfox extends EventTarget {
 
   registerApp<S>(name: string, App: SFAppConstructor<S>) {
     this.apps[name] = new App(name, this);
-    this.state[name] = this.apps[name].initialState;
+    this.state = produce(this.state, (state) => {
+      state[name] = this.apps[name].initialState;
+    });
   }
 
   /**
@@ -278,13 +306,6 @@ export class Spookfox extends EventTarget {
     });
   };
 
-  /**
-   * Handle disconnection from spookfox.
-   */
-  private handleDisconnected = async (event?: SFEvent) => {
-    console.warn('Spookfox disconnected.', { event });
-  };
-
   private rootReducer({ name, payload }: Action): any {
     const [appName, actionName] = name.split('/');
 
@@ -294,7 +315,7 @@ export class Spookfox extends EventTarget {
       );
     }
 
-    if (this.debug) {
+    if (this.logLevel) {
       console.groupCollapsed(name);
       console.log('Payload', payload);
     }
@@ -314,7 +335,7 @@ export class Spookfox extends EventTarget {
       );
     });
 
-    if (this.debug) {
+    if (this.logLevel) {
       console.log('Next state', nextState);
       console.groupEnd();
     }
