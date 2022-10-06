@@ -142,7 +142,7 @@ export class Spookfox extends EventTarget {
     }
   }
 
-  private reConnect() {
+  reConnect() {
     if (this.ws) {
       this.ws.close();
       this.reConnecting = true;

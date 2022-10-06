@@ -17,12 +17,19 @@ const run = async () => {
     }
   });
 
+  let autoConnectInterval = null;
   sf.addEventListener(SFEvents.CONNECTED, () => {
     browser.browserAction.setIcon({ path: iconEmacsColor });
+
+    if (autoConnectInterval) clearInterval(autoConnectInterval);
   });
 
   sf.addEventListener(SFEvents.DISCONNECTED, () => {
     browser.browserAction.setIcon({ path: iconEmacsMono });
+
+    autoConnectInterval = setInterval(() => {
+      sf.reConnect();
+    }, 5000);
   });
 };
 
