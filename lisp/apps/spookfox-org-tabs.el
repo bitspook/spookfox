@@ -20,12 +20,13 @@
 (defvar spookfox--known-tab-props '("id" "url" "chained" "id")
   "List of properties which are read when an org node is converted to a tab.")
 
-(defun spookfox--request-active-tab ()
+(defun spookfox-request-active-tab ()
   "Get details of active tab in browser."
   (let ((client (cl-first spookfox--connected-clients)))
     (when client
-      (spookfox-request client "GET_ACTIVE_TAB")
-      (plist-get (spookfox--poll-last-msg-payload) :payload))))
+      (plist-get
+       (spookfox--poll-response (spookfox-request client "GET_ACTIVE_TAB"))
+       :payload))))
 
 (defun spookfox--request-all-tabs ()
   "Get all tabs currently present in browser."
@@ -224,7 +225,7 @@ make changes."
 (defun spookfox-save-active-tab ()
   "Save active tab in browser."
   (interactive)
-  (let ((tab (spookfox--request-active-tab)))
+  (let ((tab (spookfox-request-active-tab)))
     (spookfox--save-tabs (list tab))))
 
 (defun spookfox-open-tab ()

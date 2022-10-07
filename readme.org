@@ -55,7 +55,7 @@ over the place.
 4. Get active tab
 
   #+begin_src elisp
-  (spookfox--request-active-tab)
+  (spookfox-request-active-tab)
   #+end_src
 
   #+RESULTS:

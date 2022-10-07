@@ -263,7 +263,7 @@ export class Spookfox extends EventTarget {
 
     return this.ws.send(
       JSON.stringify({
-        id: request.id,
+        requestId: request.id,
         payload: response,
       })
     );

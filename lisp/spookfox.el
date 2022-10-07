@@ -23,15 +23,14 @@
 (require 'org-capture)
 (require 'org-id)
 (require 'websocket)
-(require 'spookfox-lib)
 (require 'spookfox-org-tabs)
 
 (defvar spookfox-version "0.2.0"
   "Spookfox version.")
 (defvar spookfox-available-apps `((org-tabs . ,#'spookfox--org-tabs-init)))
 (defvar spookfox-enabled-apps '(org-tabs))
-(defvar spookfox--last-response nil
-  "Most recently received response from browser.")
+(defvar spookfox--responses nil
+  "Alist of responses received. Key is the request-id, val is the response.")
 (defvar spookfox--req-handlers-alist nil
   "A mapping of spookfox requests and their handlers.")
 (defvar spookfox--last-faulty-msg nil
@@ -39,6 +38,13 @@
 (defvar spookfox-server--port 59001)
 (defvar spookfox--connected-clients nil)
 (defvar spookfox--server-process nil)
+
+;; lib
+(defun spookfox--string-blank-p (str)
+  "Return t if STR is blank.
+Considers hard-space (ASCII 160) as space."
+  (string-blank-p (string-replace (concat '(160)) "" str)))
+;; lib ends here
 
 (defun spookfox--log (msg &rest args)
   "Log a MSG formatted with ARGS to *spookfox* buffer."
@@ -79,22 +85,24 @@ If CLIENT-WS is provided, message is ent only to this client."
 (defun spookfox--handle-msg (_ws frame)
   "Choose what to do with FRAME sent by a connected client.
 It try to convert the FRAME text to JSON, and pass it to
-request-handler if it is a request. Otherwise, it is treated as a response.
-For now it keep track of only the last response . If the
-communication b/w browser and Emacs gets noisier, we'll do
-something with the request-ids to keep track of requests and their
-responses."
+request-handler if it is a request. Otherwise, it is treated as a
+response. Response is saved in `spookfox--responses' alist with
+request-id as key."
   (let ((msg (websocket-frame-text frame)))
     (spookfox--log "[MESSAGE] %s" msg)
 
     (let ((msg (condition-case nil
                    (json-parse-string msg :object-type 'plist)
                  (error (setf spookfox--last-faulty-msg msg)
-                        (spookfox--log "Spookfox failed to parse a message. Check `spookfox--last-faulty-msg`")
+                        (spookfox--log "[ERROR] Spookfox failed to parse a message. Check `spookfox--last-faulty-msg`")
                         nil))))
       (if (plist-get msg :name)
           (spookfox--handle-request msg)
-        (setq spookfox--last-response msg)))))
+        (push (cons (or (plist-get msg :requestId)
+                        ;; FIXME
+                        ;; Backward Compatibility with 0.2.0
+                        ;; 0.2.0 Spookfox.ts used to send "id" instead of "requestId" in responses
+                        (plist-get msg :id)) msg) spookfox--responses)))))
 
 (defun spookfox-start-server ()
   "Start websockets server."
@@ -133,22 +141,22 @@ corresponding to this request."
   (dolist (ws spookfox--connected-clients)
     (spookfox-request ws name payload)))
 
-(defun spookfox--poll-last-msg-payload (&optional retry-count)
-  "Synchronously provide latest message received from browser.
-Returns a plist obtained be decoding incoming message. Since
+(defun spookfox--poll-response (request-id &optional retry-count)
+  "Synchronously provide response for reuqest with id REQUEST-ID.
+Returns a plist obtained by decoding the response. Since
 socket-communication with spookfox is async, this function blocks
 Emacs for maximum 1 second. If it don't receive a response in
 that time, it returns `nil`. RETRY-COUNT is for internal use, for
 reaching exit condition in recursive re-checks."
-  (cl-block spookfox--poll-last-msg-payload
-    (let ((msg spookfox--last-response)
+  (cl-block spookfox--poll-response
+    (let ((msg (alist-get request-id spookfox--responses nil nil 'equal))
           (retry-count (or retry-count 0)))
       (when (> retry-count 5)
-        (cl-return-from spookfox--poll-last-msg-payload))
+        (cl-return-from spookfox--poll-response))
       (when (not msg)
         (sleep-for 0 200)
-        (cl-return-from spookfox--poll-last-msg-payload (spookfox--poll-last-msg-payload (1+ retry-count))))
-      (setq spookfox--last-response nil)
+        (cl-return-from spookfox--poll-response (spookfox--poll-response request-id (1+ retry-count))))
+      (setf spookfox--responses (delq (assoc request-id spookfox--responses 'equal) spookfox--responses))
       msg)))
 
 (defun spookfox--handle-request (request &optional client-ws)
