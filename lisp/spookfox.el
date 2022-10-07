@@ -98,6 +98,11 @@ request-id as key."
                         nil))))
       (if (plist-get msg :name)
           (spookfox--handle-request msg)
+        ;; FIXME There is a memory leak here. If a response is not polled for
+        ;; (with `spookfox--poll-response', it is never removed from
+        ;; `spookfox--responses'. We should implement a fixed-length data
+        ;; structure; so even if nobody polls for a response, old responses
+        ;; don't just keep lying around in `spookfox--responses'
         (push (cons (or (plist-get msg :requestId)
                         ;; FIXME
                         ;; Backward Compatibility with 0.2.0

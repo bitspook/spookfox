@@ -24,8 +24,10 @@
     "default_popup": "popup/global.html"
   },
   "permissions": [
+    "<all_urls>",
     "tabs",
-    "search"
+    "search",
+    "scripting"
   ],
   "web_accessible_resources": [
   ]

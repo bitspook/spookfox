@@ -107,6 +107,10 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
     sf.registerReqHandler(EmacsRequests.OPEN_TAB, this.openTab);
     sf.registerReqHandler(EmacsRequests.OPEN_TABS, this.openTabs);
     sf.registerReqHandler(EmacsRequests.SEARCH_FOR, this.openSearchTab);
+    sf.registerReqHandler(
+      EmacsRequests.EVAL_IN_ACTIVE_TAB,
+      this.evalJsInActiveTab
+    );
     sf.addEventListener(SFEvents.NEW_STATE, this.syncChainIcon);
 
     this.addBrowserPageAction();
@@ -184,6 +188,21 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
         );
       }
     });
+  };
+
+  /**
+   * Inject Javascript sent by Emacs into active tab and send whatever it
+   * returns as response.
+   */
+  evalJsInActiveTab = async (script) => {
+    const activeTabs = await browser.tabs.query({ active: true });
+    if (!activeTabs.length) {
+      throw new Error(
+        'No active tab to execute script in. [script=${JSON.stringify(script)}]'
+      );
+    }
+
+    return Promise.all(activeTabs.map((tab) => browser.tabs.executeScript(tab.id, script)));
   };
 
   /**
@@ -507,4 +526,5 @@ export enum EmacsRequests {
   OPEN_TAB = 'OPEN_TAB',
   OPEN_TABS = 'OPEN_TABS',
   SEARCH_FOR = 'SEARCH_FOR',
+  EVAL_IN_ACTIVE_TAB = 'EVAL_IN_ACTIVE_TAB',
 }
