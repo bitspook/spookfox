@@ -5,7 +5,7 @@
 ;; Author: bitspook
 ;; Homepage: https://github.com/bitspook/spookfox
 ;; Keywords: Firefox
-;; Version: 0.2.1
+;; Version: 0.2.2
 ;; Package-Requires: ((websocket "1.13"))
 ;;
 ;;; Commentary:
@@ -25,7 +25,7 @@
 (require 'websocket)
 (require 'spookfox-org-tabs)
 
-(defvar spookfox-version "0.2.1"
+(defvar spookfox-version "0.2.2"
   "Spookfox version.")
 (defvar spookfox-available-apps `((org-tabs . ,#'spookfox--org-tabs-init)))
 (defvar spookfox-enabled-apps '(org-tabs))
