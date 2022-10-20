@@ -4,6 +4,7 @@ import iconEmacsMono from './icons/emacs-mono.svg';
 import iconEmacsColor from './icons/emacs-color.svg';
 import Tabs from './apps/Tabs';
 import OrgTabs from './apps/OrgTabs';
+import JsInject from './apps/JsInject';
 
 const run = async () => {
   const sf = ((window as any).spookfox = new Spookfox());
@@ -16,6 +17,10 @@ const run = async () => {
       }
       case 'spookfox-org-tabs': {
         sf.registerApp('org-tabs', OrgTabs);
+        break;
+      }
+      case 'spookfox-js-injection': {
+        sf.registerApp('js-injection', JsInject);
         break;
       }
       default:

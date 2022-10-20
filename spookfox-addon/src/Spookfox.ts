@@ -228,7 +228,9 @@ export class Spookfox extends EventTarget {
   registerApp<S>(name: string, App: SFAppConstructor<S>) {
     if (this.apps[name]) return;
     this.apps[name] = new App(name, this);
-    this.apps[name]?.init();
+
+    if (typeof this.apps[name].init === 'function') this.apps[name].init();
+
     this.state = produce(this.state, (state) => {
       state[name] = this.apps[name].initialState;
     });
@@ -326,7 +328,7 @@ export class Spookfox extends EventTarget {
     const app = this.apps[appName];
 
     if (!app) {
-      console.log("APPS", app, appName, this.apps[appName]);
+      console.log('APPS', app, appName, this.apps[appName]);
       console.groupEnd();
       throw new Error(
         `Could not find Spookfox app "${appName}". Was it registered?`

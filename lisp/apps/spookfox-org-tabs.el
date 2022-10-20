@@ -224,7 +224,7 @@ PAYLOAD is a plist with :id and :patch"
                     (spookfox-org-tabs--insert-tab (plist-put tab :chained chained?)))))
     (spookfox-org-tabs--find-tab-with-id tab-id)))
 
-(defun spookfox-org-tabs--save-all-tabs ()
+(defun spookfox-org-tabs-save-all-tabs ()
   "Save all currently open browser tabs at `spookfox-saved-tabs-target`.
 It will open a capture buffer so user get a chance to preview and
 make changes."
@@ -232,13 +232,13 @@ make changes."
   (let ((tabs (spookfox-org-tabs--request-all-tabs)))
     (spookfox-org-tabs--save-tabs tabs)))
 
-(defun spookfox-save-active-tab ()
+(defun spookfox-org-tabs-save-active-tab ()
   "Save active tab in browser."
   (interactive)
   (let ((tab (spookfox-org-tabs--request-active-tab)))
     (spookfox-org-tabs--save-tabs (list tab))))
 
-(defun spookfox-open-org-tab ()
+(defun spookfox-org-tabs-open ()
   "Prompt user to select a tab and open it in spookfox browser."
   (interactive)
   (let ((tab (spookfox-org-tabs--tab-read))
@@ -252,7 +252,7 @@ make changes."
        (t
         (spookfox-org-tabs--request client "SEARCH_FOR" tab))))))
 
-(defun spookfox-open-org-tab-group ()
+(defun spookfox-org-tabs-open-group ()
   "Prompt for a tab group, and open all tabs belonging to that group."
   (interactive)
   (let* ((tabs (spookfox-org-tabs--get-saved-tabs))
@@ -270,30 +270,6 @@ make changes."
                                         ; spookfox-org-tabs--request can parse it again
                                         ; into a proper JSON array
         (concat "[" (string-join (mapcar #'json-encode group-tabs) ",") "]"))))))
-
-(defun spookfox-eval-js-in-active-tab (js &optional just-the-tip-p)
-  "Evaluate JS in active firefox tab.
-Return value is a list of lists. Browser can have multiple active
-tabs (one per window). Every active tab can have multiple frames.
-If JUST-THE-TIP-P is non-nil, first tab's first frame's return
-value from the results is returned (instead of list of lists).
-
-JS is subjected to limitations of browser's ability to execute
-it. It is similar to executing js in browser's console. So for
-example running a script which declares a variable with `let` or
-`const` might cause the script to fail execution.
-
-Details about js execution:
-https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/tabs/executeScript"
-  (let ((client (first spookfox--connected-clients)))
-    (when client
-      (let ((result (plist-get
-                     (spookfox--poll-response
-                      (spookfox-org-tabs--request client "EVAL_IN_ACTIVE_TAB"
-                                        `((code . ,js))))
-                     :payload)))
-        (if just-the-tip-p (seq-first (seq-first result))
-          result)))))
 
 ;;;###autoload
 (defun spookfox-org-tabs ()
