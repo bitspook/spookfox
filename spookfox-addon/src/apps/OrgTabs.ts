@@ -106,15 +106,14 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
     sf.registerReqHandler(EmacsRequests.GET_ALL_TABS, this.getAllTabs);
     sf.registerReqHandler(EmacsRequests.OPEN_TAB, this.openTab);
     sf.registerReqHandler(EmacsRequests.OPEN_TABS, this.openTabs);
-    sf.registerReqHandler(EmacsRequests.SEARCH_FOR, this.openSearchTab);
     sf.registerReqHandler(
       EmacsRequests.EVAL_IN_ACTIVE_TAB,
       this.evalJsInActiveTab
     );
     sf.addEventListener(SFEvents.NEW_STATE, this.syncChainIcon);
+    sf.registerReqHandler(EmacsRequests.SEARCH_FOR, this.openSearchTab);
 
     this.addBrowserPageAction();
-    this.init();
   }
 
   addBrowserPageAction = () => {
@@ -129,7 +128,7 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
 
       try {
         const savedTab = (await sf.request(
-          'TOGGLE_TAB_CHAINING',
+          EmacsRequests.TOGGLE_TAB_CHAINING,
           fromBrowserTab({
             ...t,
             ...localSavedTab,
@@ -202,7 +201,9 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
       );
     }
 
-    return Promise.all(activeTabs.map((tab) => browser.tabs.executeScript(tab.id, script)));
+    return Promise.all(
+      activeTabs.map((tab) => browser.tabs.executeScript(tab.id, script))
+    );
   };
 
   /**
@@ -223,12 +224,6 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
     }
 
     return fromBrowserTab(tabs[0]);
-  };
-
-  openSearchTab = async (p: string) => {
-    (browser as any).search.search({ query: p });
-
-    return {};
   };
 
   /**
@@ -355,7 +350,7 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
 
     if (savedTab?.chained) {
       try {
-        const updatedTab = await this.sf.request('UPDATE_TAB', {
+        const updatedTab = await this.sf.request(EmacsRequests.UPDATE_TAB, {
           id: savedTab.id,
           patch: desiredProps.reduce((accum, prop) => {
             // Make sure we aren't sending unnecessary props to Emacs (e.g
@@ -387,7 +382,7 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
 
     if (savedTab?.chained) {
       try {
-        const removedTab = await this.sf.request('REMOVE_TAB', {
+        const removedTab = await this.sf.request(EmacsRequests.REMOVE_TAB, {
           id: savedTabId,
         });
         this.dispatch(Actions.REMOVE_TAB_SUCCESS, removedTab);
@@ -402,10 +397,16 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
     }
   };
 
+  openSearchTab = async (p: string) => {
+    (browser as any).search.search({ query: p });
+
+    return {};
+  };
+
   /**
    * Initialize the state.
    */
-  private init = async () => {
+  init = async () => {
     const savedTabs = (await this.sf.request(
       EmacsRequests.GET_SAVED_TABS
     )) as SavedTab[];
@@ -519,12 +520,14 @@ export enum Actions {
 }
 
 export enum EmacsRequests {
-  TOGGLE_TAB_CHAINING = 'TOGGLE_TAB_CHAINING',
-  GET_SAVED_TABS = 'GET_SAVED_TABS',
-  GET_ACTIVE_TAB = 'GET_ACTIVE_TAB',
-  GET_ALL_TABS = 'GET_ALL_TABS',
-  OPEN_TAB = 'OPEN_TAB',
-  OPEN_TABS = 'OPEN_TABS',
-  SEARCH_FOR = 'SEARCH_FOR',
-  EVAL_IN_ACTIVE_TAB = 'EVAL_IN_ACTIVE_TAB',
+  TOGGLE_TAB_CHAINING = 'OT_TOGGLE_TAB_CHAINING',
+  GET_SAVED_TABS = 'OT_GET_SAVED_TABS',
+  GET_ACTIVE_TAB = 'OT_GET_ACTIVE_TAB',
+  GET_ALL_TABS = 'OT_GET_ALL_TABS',
+  OPEN_TAB = 'OT_OPEN_TAB',
+  OPEN_TABS = 'OT_OPEN_TABS',
+  EVAL_IN_ACTIVE_TAB = 'OT_EVAL_IN_ACTIVE_TAB',
+  REMOVE_TAB = 'OT_REMOVE_TAB',
+  SEARCH_FOR = 'OT_SEARCH_FOR',
+  UPDATE_TAB = 'OT_UPDATE_TAB',
 }

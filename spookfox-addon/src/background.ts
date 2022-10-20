@@ -1,21 +1,28 @@
-import OrgTabs from './apps/OrgTabs';
 import { SFEvents, Spookfox } from './Spookfox';
 // eslint-disable-next-line
 import iconEmacsMono from './icons/emacs-mono.svg';
 import iconEmacsColor from './icons/emacs-color.svg';
+import Tabs from './apps/Tabs';
+import OrgTabs from './apps/OrgTabs';
 
 const run = async () => {
   const sf = ((window as any).spookfox = new Spookfox());
 
   sf.registerReqHandler('ENABLE_APP', (name: string) => {
     switch (name) {
-      case 'org-tabs': {
+      case 'spookfox-tabs': {
+        sf.registerApp('tabs', Tabs);
+        break;
+      }
+      case 'spookfox-org-tabs': {
         sf.registerApp('org-tabs', OrgTabs);
-        return { status: 'ok' };
+        break;
       }
       default:
         return { status: 'error', message: `Uknown app ${name}` };
     }
+
+    return { status: 'ok' };
   });
 
   let autoConnectInterval = null;

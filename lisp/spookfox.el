@@ -23,12 +23,10 @@
 (require 'org-capture)
 (require 'org-id)
 (require 'websocket)
-(require 'spookfox-org-tabs)
 
 (defvar spookfox-version "0.2.2"
   "Spookfox version.")
-(defvar spookfox-available-apps `((org-tabs . ,#'spookfox--org-tabs-init)))
-(defvar spookfox-enabled-apps '(org-tabs))
+(defvar spookfox-enabled-apps nil)
 (defvar spookfox--responses nil
   "Alist of responses received. Key is the request-id, val is the response.")
 (defvar spookfox--req-handlers-alist nil
@@ -38,6 +36,8 @@
 (defvar spookfox-server--port 59001)
 (defvar spookfox--connected-clients nil)
 (defvar spookfox--server-process nil)
+(defvar spookfox--msg-prefix ""
+  "String to prefix names of messages sent by `spookfox-request'.")
 
 ;; lib
 (defun spookfox--string-blank-p (str)
@@ -51,13 +51,6 @@ Considers hard-space (ASCII 160) as space."
   (with-current-buffer (get-buffer-create "*spookfox*")
     (goto-char (point-max))
     (insert (apply #'format (concat "\n" msg) args))))
-
-(defun spookfox--enable-app (app)
-  "Register spookfox-app APP.
-A spookfox APP is anything given there is a function named
-spookfox--<app>-init, which is called to enable the app."
-  (let* ((init-fn (alist-get app spookfox-available-apps)))
-    (funcall init-fn)))
 
 (defun spookfox--handle-new-client (ws)
   "When a new client connects, save the connected websocket WS."
@@ -131,9 +124,11 @@ request-id as key."
 Returns the request-id so the caller can retrieve a response
 corresponding to this request."
   (let ((id (org-id-uuid))
-        (name (if (symbolp name)
-                  (string-replace "-" "_" (upcase (symbol-name name)))
-                (upcase name))))
+        (name (concat
+               spookfox--msg-prefix
+               (if (symbolp name)
+                   (string-replace "-" "_" (upcase (symbol-name name)))
+                 (upcase name)))))
     (spookfox--send-msg
      (json-encode `((name . ,name)
                     (id . ,id)
@@ -188,17 +183,18 @@ If CLIENT-WS is provided, response is sent to this client only."
                                        (payload . ,res-payload)))
                         client-ws)))
 
-(defun spookfox--register-req-handler (request handler)
-  "Run HANDLER every time REQUEST is received from browser.
+(defun spookfox--register-req-handler (name handler)
+  "Run HANDLER every time request with NAME is received from browser.
 Return value of HANDLER is sent back to browser as response."
-  (let ((cell (assoc request spookfox--req-handlers-alist #'string=)))
+  (let* ((name (concat spookfox--msg-prefix name))
+         (cell (assoc name spookfox--req-handlers-alist #'string=)))
     (when cell (warn "Handler already registered. Overwriting previously registered handler."))
-    (push (cons request handler) spookfox--req-handlers-alist)))
+    (push (cons name handler) spookfox--req-handlers-alist)))
 
 (defun spookfox-init ()
   "Initialize spookfox with enabled apps."
   (dolist (app spookfox-enabled-apps)
-    (spookfox--enable-app app))
+    (funcall app))
 
   (spookfox-start-server))
 

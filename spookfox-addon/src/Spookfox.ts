@@ -23,6 +23,7 @@ export interface SFApp<S> {
   name: string;
   initialState: Immutable<S>;
   reducer: (action: { name: string; payload: any }, state: S) => S;
+  init?: () => void;
 }
 
 export interface SFAppConstructor<S> {
@@ -227,6 +228,7 @@ export class Spookfox extends EventTarget {
   registerApp<S>(name: string, App: SFAppConstructor<S>) {
     if (this.apps[name]) return;
     this.apps[name] = new App(name, this);
+    this.apps[name]?.init();
     this.state = produce(this.state, (state) => {
       state[name] = this.apps[name].initialState;
     });
@@ -324,6 +326,8 @@ export class Spookfox extends EventTarget {
     const app = this.apps[appName];
 
     if (!app) {
+      console.log("APPS", app, appName, this.apps[appName]);
+      console.groupEnd();
       throw new Error(
         `Could not find Spookfox app "${appName}". Was it registered?`
       );
