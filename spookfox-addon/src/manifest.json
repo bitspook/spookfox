@@ -2,7 +2,7 @@
   "description": "Make Firefox speak to Emacs",
   "manifest_version": 2,
   "name": "Spookfox",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "icons": {
     "48": "icons/chained-dark.svg"
   },
