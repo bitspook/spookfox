@@ -1,10 +1,10 @@
-import { Draft, freeze, Immutable } from 'immer';
+import { Draft, Immutable } from 'immer';
 import { SFApp, Spookfox } from '~src/Spookfox';
 
-export type TabsState = Immutable<{}>;
+export type TabsState = Immutable<null>;
 
 export default class Tabs implements SFApp<TabsState> {
-  initialState: Immutable<TabsState> = freeze({}, true);
+  initialState: Immutable<TabsState> = null;
 
   get state(): TabsState {
     return this.sf.state[this.name];
@@ -81,7 +81,7 @@ export default class Tabs implements SFApp<TabsState> {
     this.dispatch(Actions.INIT, null);
   };
 
-  reducer({}, state: Draft<TabsState>) {
+  reducer(_, state: Draft<TabsState>) {
     return state;
   }
 }

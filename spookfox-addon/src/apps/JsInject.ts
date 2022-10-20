@@ -1,10 +1,10 @@
-import { Draft, freeze, Immutable } from 'immer';
+import { Draft, Immutable } from 'immer';
 import { SFApp, Spookfox } from '~src/Spookfox';
 
-export type JsInjectState = Immutable<{}>;
+export type JsInjectState = Immutable<null>;
 
 export default class JsInject implements SFApp<JsInjectState> {
-  initialState: Immutable<JsInjectState> = freeze({}, true);
+  initialState: Immutable<JsInjectState> = null;
 
   get state(): JsInjectState {
     return this.sf.state[this.name];
