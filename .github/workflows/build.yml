@@ -21,7 +21,7 @@ jobs:
       - run: yarn
         working-directory: spookfox-addon
 
-      - run: yarn publish-addon
+      - run: yarn build-addon
         working-directory: spookfox-addon
         env:
           FIREFOX_ADDON_KEY: "${{ secrets.FIREFOX_ADDON_KEY }}"
@@ -30,7 +30,7 @@ jobs:
       - uses: actions/upload-artifact@v2
         with:
           name: spookfox-addon
-          path: spookfox-addon/dist/addons/*.xpi
+          path: spookfox-addon/dist/addons/*.zip
 
   release:
     name: Create a release
@@ -43,10 +43,8 @@ jobs:
         with:
           path: ./release
 
-      - run: mv ./release/spookfox-addon/*.xpi ./release/spookfox-firefox.xpi
-
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            ./release/spookfox-firefox.xpi
+            ./release/spookfox-*.zip
