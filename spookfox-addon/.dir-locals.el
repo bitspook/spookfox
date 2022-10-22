@@ -2,6 +2,4 @@
 ;;; For more information see (info "(emacs) Directory Variables")
 
 ((typescript-mode . ((eval .
-                           (setf
-                            flycheck-javascript-eslint-executable
-                            (expand-file-name "spookfox-addon/node_modules/.bin/eslint" (projectile-project-root)))))))
+                           (add-to-list 'exec-path (concat (locate-dominating-file default-directory ".dir-locals.el") "node_modules/.bin/"))))))
