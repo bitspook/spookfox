@@ -7,7 +7,7 @@
     "build": "parcel build src/manifest.json 'src/apps/*.ts'",
     "lint": "eslint src/ && tsc --noEmit",
     "build-addon": "yarn build && web-ext -s ./dist -a ./dist/addons build",
-    "publish-test-addon": "yarn build && web-ext -s ./dist -a ./dist/addons --api-key $FIREFOX_ADDON_KEY --api-secret $FIREFOX_ADDON_SECRET sign --channel=unlisted"
+    "publish-unlisted-addon": "yarn build && web-ext -s ./dist -a ./dist/addons --api-key $FIREFOX_ADDON_KEY --api-secret $FIREFOX_ADDON_SECRET sign --channel=unlisted"
   },
   "devDependencies": {
     "@parcel/config-webextension": "^2.3.2",
