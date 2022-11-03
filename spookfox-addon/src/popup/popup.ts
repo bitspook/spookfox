@@ -2,11 +2,8 @@ const button = document.querySelector('.reconnect');
 const statusDot = document.querySelector('.status > #dot');
 const statusMsg = document.querySelector('.status > #msg');
 
-const reconnect = async () => {
-  const sf = (await browser.runtime.getBackgroundPage()).spookfox;
-  sf.reConnect();
-
-  setTimeout(() => button.classList.remove('rotating'), 2000);
+const reconnect = async (port: browser.runtime.Port) => {
+  port.postMessage({ type: 'RECONNECT' });
 };
 
 const handleConnected = () => {
@@ -29,24 +26,25 @@ const handleConnecting = () => {
 };
 
 const init = async () => {
-  const sf = (await browser.runtime.getBackgroundPage()).spookfox;
+  const port = browser.runtime.connect();
 
-  if (!sf) {
-    console.warn('NO Spookfox');
+  if (!port) {
+    console.warn('No Spookfox port');
     return;
   }
 
-  if (sf.isConnected) {
-    handleConnected();
-  } else {
-    handleDisconnected();
-  }
+  port.onMessage.addListener((msg: { type: string }) => {
+    switch (msg.type) {
+      case 'CONNECTED':
+        return handleConnected();
+      case 'CONNECTING':
+        return handleConnecting();
+      case 'DISCONNECTED':
+        return handleDisconnected();
+    }
+  });
 
-  sf.addEventListener('CONNECTED', handleConnected);
-  sf.addEventListener('CONNECTING', handleConnecting);
-  sf.addEventListener('DISCONNECTED', handleDisconnected);
+  button.addEventListener('click', () => reconnect(port));
 };
 
 init();
-
-button.addEventListener('click', reconnect);

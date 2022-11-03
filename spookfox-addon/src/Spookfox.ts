@@ -97,7 +97,7 @@ export class Spookfox extends EventTarget {
   }
 
   get isConnected() {
-    return this.ws.readyState === this.ws.OPEN;
+    return this.ws && this.ws.readyState === this.ws.OPEN;
   }
 
   get logLevel(): LogLevel {
@@ -129,7 +129,7 @@ export class Spookfox extends EventTarget {
     this.addEventListener(SFEvents.RESPONSE, this.handleResponse);
   }
 
-  private async handleServerMsg(event: MessageEvent<string>) {
+  handleServerMsg = async (event: MessageEvent<string>) => {
     try {
       const msg = JSON.parse(event.data);
 
@@ -141,7 +141,7 @@ export class Spookfox extends EventTarget {
     } catch (err) {
       console.error(`Bad ws message [err=${err}, msg=${event.data}]`);
     }
-  }
+  };
 
   reConnect() {
     if (this.ws) {
@@ -152,17 +152,25 @@ export class Spookfox extends EventTarget {
     if (!this.reConnecting) this.emit(SFEvents.CONNECTING);
     this.ws = new WebSocket(this.wsUrl);
 
-    this.ws.onopen = () => {
+    const handleWsOpen = () => {
       this.emit(SFEvents.CONNECTED);
     };
 
-    this.ws.onclose = () => {
+    const handleWsClose = () => {
+      this.ws.removeEventListener('open', handleWsOpen);
+      this.ws.removeEventListener('close', handleWsClose);
+      this.ws.removeEventListener('message', this.handleServerMsg);
+
       this.emit(SFEvents.DISCONNECTED);
       if (this.reConnecting) this.emit(SFEvents.CONNECTING);
+
+      this.ws = null;
       this.reConnecting = false;
     };
 
-    this.ws.onmessage = this.handleServerMsg.bind(this);
+    this.ws.addEventListener('open', handleWsOpen);
+    this.ws.addEventListener('close', handleWsClose);
+    this.ws.addEventListener('message', this.handleServerMsg);
 
     return this.ws;
   }
@@ -176,6 +184,13 @@ export class Spookfox extends EventTarget {
    * ```
    */
   async request(name: string, payload?: object) {
+    if (!this.ws) {
+      console.error(
+        `Not connected to Spookfox Server. Dropping request ${name}.`
+      );
+      return;
+    }
+
     const request = {
       id: uuid(),
       name,
@@ -195,7 +210,7 @@ export class Spookfox extends EventTarget {
   /**
    * A convenience function for emitting new events to `Spookfox`.
    */
-  emit(name: SFEvents, payload?: object) {
+  emit = (name: SFEvents, payload?: object) => {
     const event = new SFEvent(name, payload);
 
     if (this.logLevel >= LogLevel.Debug) {
@@ -203,7 +218,7 @@ export class Spookfox extends EventTarget {
     }
 
     this.dispatchEvent(event);
-  }
+  };
 
   /**
    * Run a function when Emacs makes a request.
@@ -265,7 +280,7 @@ export class Spookfox extends EventTarget {
     }
     const response = await executioner(request.payload, this);
 
-    return this.ws.send(
+    return this.ws?.send(
       JSON.stringify({
         requestId: request.id,
         payload: response,

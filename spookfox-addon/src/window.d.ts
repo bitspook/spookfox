@@ -1,6 +1,8 @@
+import { Spookfox } from './Spookfox';
+
 declare global {
   interface Window {
-    spookfox: any;
+    spookfox: Spookfox;
   }
 }
 

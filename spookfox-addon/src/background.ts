@@ -6,6 +6,60 @@ import Tabs from './apps/Tabs';
 import OrgTabs from './apps/OrgTabs';
 import JsInject from './apps/JsInject';
 
+let autoConnectInterval = null;
+let connectedPorts: browser.runtime.Port[] = [];
+
+browser.runtime.onConnect.addListener((port) => {
+  connectedPorts.push(port);
+  port.postMessage({
+    type: window.spookfox.isConnected ? 'CONNECTED' : 'DISCONNECTED',
+  });
+
+  port.onDisconnect.addListener(
+    () => (connectedPorts = connectedPorts.filter((p) => p !== port))
+  );
+
+  port.onMessage.addListener((msg: { type: string }) => {
+    const sf = window.spookfox;
+
+    switch (msg.type) {
+      case 'RECONNECT':
+        return sf.reConnect();
+    }
+  });
+});
+
+const startAutoconnectTimer = (sf: Spookfox) => {
+  sf.addEventListener(SFEvents.CONNECTED, () => {
+    browser.browserAction.setIcon({ path: iconEmacsColor });
+
+    if (autoConnectInterval) clearInterval(autoConnectInterval);
+
+    connectedPorts.forEach((port) => {
+      port.postMessage({ type: 'CONNECTED' });
+    });
+  });
+
+  sf.addEventListener(SFEvents.CONNECTING, () => {
+    connectedPorts.forEach((port) => {
+      port.postMessage({ type: 'CONNECTING' });
+    });
+  });
+
+  sf.addEventListener(SFEvents.DISCONNECTED, () => {
+    connectedPorts.forEach((port) => {
+      port.postMessage({ type: 'DISCONNECTED' });
+    });
+
+    browser.browserAction.setIcon({ path: iconEmacsMono });
+    if (!autoConnectInterval) {
+      autoConnectInterval = setInterval(() => {
+        sf.reConnect();
+      }, 5000);
+    }
+  });
+};
+
 const run = async () => {
   const sf = ((window as any).spookfox = new Spookfox());
 
@@ -30,20 +84,7 @@ const run = async () => {
     return { status: 'ok' };
   });
 
-  let autoConnectInterval = null;
-  sf.addEventListener(SFEvents.CONNECTED, () => {
-    browser.browserAction.setIcon({ path: iconEmacsColor });
-
-    if (autoConnectInterval) clearInterval(autoConnectInterval);
-  });
-
-  sf.addEventListener(SFEvents.DISCONNECTED, () => {
-    browser.browserAction.setIcon({ path: iconEmacsMono });
-
-    autoConnectInterval = setInterval(() => {
-      sf.reConnect();
-    }, 5000);
-  });
+  startAutoconnectTimer(sf);
 };
 
 run().catch((err) => {

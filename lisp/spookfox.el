@@ -119,6 +119,10 @@ request-id as key."
          :on-message #'spookfox--handle-msg
          :on-error #'spookfox--handle-server-error)))
 
+(defun spookfox-stop-server ()
+  "Stop websockets server."
+  (websocket-server-close spookfox--server-process))
+
 (defun spookfox-request (client-ws name &optional payload)
   "Make a request to CLIENT-WS with NAME and optionally a PAYLOAD to browser.
 Returns the request-id so the caller can retrieve a response
