@@ -21,14 +21,19 @@ export default class Tabs implements SFApp<TabsState> {
     sf.registerReqHandler(EmacsRequests.SEARCH_FOR, this.openSearchTab);
   }
 
+  async currentWindowId() {
+    const currentWindow = await browser.windows.getCurrent();
+
+    return currentWindow.id;
+  }
+
   /**
-   * Get the active tab of first browser window. Let's not go in the nuances of
-   * multiple browser windows just yet. For now, we work with the first browser
-   * window that was opened. In Firefox, this window gets an id=1. Might need to
-   * check this behavior when we are adding chrome support.
+   * Get the active tab of given browser-window, or if none provided, of current
+   * browser window. Current-browser window is decided by browser.
    */
-  getActiveTab = async (): Promise<any> => {
-    const tabs = await browser.tabs.query({ windowId: 1, active: true });
+  getActiveTab = async (msg: { windowId?: number }): Promise<any> => {
+    const windowId = (msg || {}).windowId || (await this.currentWindowId());
+    const tabs = await browser.tabs.query({ windowId, active: true });
 
     if (!tabs.length) {
       // Probably shouldn't be doing this, but just throwing an error and calling it
@@ -48,11 +53,12 @@ export default class Tabs implements SFApp<TabsState> {
   };
 
   /**
-   * Get all tabs which are open in first browser window. Follows same semantics
-   * as `getActiveTab`
+   * Get all tabs which are open in given or current browser window. Follows
+   * same semantics as `getActiveTab`
    */
-  getAllTabs = async (): Promise<any[]> => {
-    const tabs = await browser.tabs.query({ windowId: 1 });
+  getAllTabs = async (msg: { windowId?: number } = {}): Promise<any[]> => {
+    const windowId = (msg || {}).windowId || (await this.currentWindowId());
+    const tabs = await browser.tabs.query({ windowId });
 
     return tabs;
   };
