@@ -16,12 +16,12 @@
   (let ((spookfox--msg-prefix spookfox-tabs--msg-prefix))
     (apply #'spookfox-request args)))
 
-(defun spookfox-request-active-tab ()
-  "Get details of active tab in browser."
+(defun spookfox-request-active-tab (&optional window-id)
+  "Get details of active tab in browser. Optionally provide a numeric WINDOW-ID."
   (let ((client (cl-first spookfox--connected-clients)))
     (when client
       (plist-get
-       (spookfox--poll-response (spookfox-tabs--request client "GET_ACTIVE_TAB"))
+       (spookfox--poll-response (spookfox-tabs--request client "GET_ACTIVE_TAB" `(:windowId ,window-id)))
        :payload))))
 
 (defun spookfox--request-all-tabs ()
