@@ -2,7 +2,7 @@
   "description": "Make Firefox speak to Emacs",
   "manifest_version": 2,
   "name": "Spookfox",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "icons": {
     "48": "icons/chained-dark.svg"
   },
@@ -13,9 +13,7 @@
     }
   },
   "background": {
-    "scripts": [
-      "./background.ts"
-    ]
+    "scripts": ["./background.ts"]
   },
   "page_action": {},
   "browser_action": {
@@ -23,12 +21,6 @@
     "default_title": "Spookfox",
     "default_popup": "popup/global.html"
   },
-  "permissions": [
-    "<all_urls>",
-    "tabs",
-    "search",
-    "scripting"
-  ],
-  "web_accessible_resources": [
-  ]
+  "permissions": ["<all_urls>", "tabs", "search", "scripting"],
+  "web_accessible_resources": []
 }
