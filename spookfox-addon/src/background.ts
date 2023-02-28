@@ -9,6 +9,19 @@ import JsInject from './apps/JsInject';
 let autoConnectInterval = null;
 let connectedPorts: browser.runtime.Port[] = [];
 
+// Messages from content script
+browser.runtime.onMessage.addListener(
+  (msg: { type: string; action: { name: string; payload?: any } }) => {
+    const sf = window.spookfox;
+    switch (msg.type) {
+      case 'SPOOKFOX_RELAY_TO_EMACS': {
+        sf.request(msg.action.name, msg.action.payload);
+      }
+    }
+  }
+);
+
+// Messages from popup
 browser.runtime.onConnect.addListener((port) => {
   connectedPorts.push(port);
   port.postMessage({
