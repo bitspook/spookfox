@@ -8,6 +8,7 @@
 (require 'org-id)
 (require 'cl-lib)
 (require 'spookfox)
+(require 'spookfox-jscl)
 
 (defvar spookfox-tabs--msg-prefix "T_")
 
@@ -28,8 +29,10 @@
   "Get all tabs currently present in browser."
   (let ((client (cl-first spookfox--connected-clients)))
     (when client
-      (spookfox-tabs--request client "GET_ALL_TABS")
-      (plist-get (spookfox--poll-last-msg-payload) :payload))))
+      (plist-get
+       (spookfox--poll-response
+        (spookfox-tabs--request client "GET_ALL_TABS"))
+       :payload))))
 
 (defun spookfox-open-new-tab ()
   "Prompt user to select a tab and open it in spookfox browser."
@@ -43,11 +46,37 @@
        (t
         (spookfox-tabs--request client "SEARCH_FOR" tab))))))
 
+(defun spookfox-switch-tab ()
+  "Like `switch-buffer' but for browser and its tabs.
+When you have too many tabs to find what you want; or you want to
+jump to browser with your desired tab already in focus."
+  (interactive)
+  (let* ((tabs (spookfox--request-all-tabs))
+         (tabs (mapcar (lambda (tab)
+                         (cons (concat (plist-get tab :title) "\t"
+                                       (propertize (plist-get tab :url) 'face 'font-lock-comment-face))
+                               tab))
+                       tabs))
+         (selected-tab (completing-read "Select tab: " tabs))
+         (selected-tab (alist-get selected-tab tabs nil nil #'string=))
+         (tab-id (plist-get selected-tab :id))
+         (window-id (plist-get selected-tab :windowId))
+         (client (cl-first spookfox--connected-clients)))
+    ;; (spookfox-tabs--request client "ACTIVATE_TAB" selected-tab)
+    (sfcl-eval
+     `(progn
+        (js:browser:tabs:update ,tab-id ,(sfcl-js-obj '(("active" . t))))
+        (js:browser:windows:update ,window-id ,(sfcl-js-obj '(("focused" . t))))
+        t))))
+
 ;;;###autoload
 (defun spookfox-tabs ()
   "Initialize spookfox-tabs app."
-  ;; Pass. Nothing to initialize.
-  )
+  ;; We need spookfox-jscl to do some work
+  (spookfox-jscl))
 
 (provide 'spookfox-tabs)
 ;;; spookfox-tabs.el ends here
+;; Local Variables:
+;; read-symbol-shorthands: (("sft-" . "spookfox-tabs-") ("sfcl-" . "spookfox-jscl-"))
+;; End:

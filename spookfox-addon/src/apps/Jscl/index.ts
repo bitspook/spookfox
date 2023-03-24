@@ -29,7 +29,20 @@ export default class Jscl implements SFApp<JsclState> {
   }
 
   evalInBackgroundScript = async (lispStr: string) => {
-    return (window as any).jscl.evaluateString(lispStr);
+    const timerLabel = `Evaluating`;
+    try {
+      console.time(timerLabel);
+      console.log(lispStr);
+      return (window as any).jscl.evaluateString(lispStr);
+    } catch (err) {
+      console.error('Error occurred while evaluating JSCL', err);
+      return {
+        error: 'Failed to eval CL. Check addon console.',
+        message: err.message,
+      };
+    } finally {
+      console.timeEnd(timerLabel);
+    }
   };
 
   reducer(_action: any, _state: Draft<JsclState>) {
