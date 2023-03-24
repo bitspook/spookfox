@@ -36,7 +36,7 @@ form."
   (let ((client (cl-first spookfox--connected-clients))
         (str-form (string-replace "(js:" "(#j:" (prin1-to-string form))))
     (case context
-      ('background
+      (background
        (when client
          (plist-get
           (spookfox--poll-response (sfcl--request client "EVAL_BG" str-form))

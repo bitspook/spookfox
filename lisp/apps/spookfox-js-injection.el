@@ -55,7 +55,7 @@ Supported contexts:
       (plist-get
        (spookfox--poll-response
         (case context
-          ('background
+          (background
            (sfjsi--request client "EVAL_IN_BACKGROUND_SCRIPT" `((code . ,js))))
           (t (error "Unsupported context: %s" context))))
        :payload))))
