@@ -1,15 +1,5 @@
 import { Draft, Immutable } from 'immer';
 import { SFApp, Spookfox } from '~src/Spookfox';
-// JSCL.evalToString does not work if jscl is included directly in
-// manifest->background->scripts. In that case, JSCL tries to use JS's eval and
-// browser throws a CSP error
-try {
-  // Loading JSCL is throwing an error, although it seems to be capable of doing
-  // its job
-  require('./jscl');
-} catch (err) {
-  /* pass */
-}
 
 export type JsclState = Immutable<null>;
 

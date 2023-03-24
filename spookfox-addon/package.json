@@ -3,15 +3,16 @@
   "version": "0.2.8",
   "license": "GPL-3.0",
   "scripts": {
-    "start": "parcel serve src/manifest.json 'src/apps/*.ts'",
-    "build": "parcel build src/manifest.json 'src/apps/*.ts'",
+    "clean": "rm -rf dist",
+    "build": "yarn clean && parcel build src/manifest.json 'src/apps/**/*.ts' && node ./post-build.js",
+    "start": "yarn clean && parcel serve src/manifest.json 'src/apps/*.ts'",
     "lint": "eslint src/ && tsc --noEmit",
     "build-addon": "yarn build && web-ext -s ./dist -a ./dist/addons build",
     "publish-unlisted-addon": "yarn build && web-ext -s ./dist -a ./dist/addons --api-key $FIREFOX_ADDON_KEY --api-secret $FIREFOX_ADDON_SECRET sign --channel=unlisted"
   },
   "devDependencies": {
     "@parcel/config-webextension": "^2.3.2",
-    "@parcel/transformer-sass": "2.7.0",
+    "@parcel/transformer-sass": "2.8.3",
     "@typescript-eslint/eslint-plugin": "^5.12.1",
     "@typescript-eslint/parser": "^5.12.1",
     "eslint": "^8.9.0",
