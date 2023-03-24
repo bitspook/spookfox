@@ -5,6 +5,7 @@ import iconEmacsColor from './icons/emacs-color.svg';
 import Tabs from './apps/Tabs';
 import OrgTabs from './apps/OrgTabs';
 import JsInject from './apps/JsInject';
+import Jscl from './apps/Jscl';
 
 let autoConnectInterval = null;
 let connectedPorts: browser.runtime.Port[] = [];
@@ -88,6 +89,10 @@ const run = async () => {
       }
       case 'spookfox-js-injection': {
         sf.registerApp('js-injection', JsInject);
+        break;
+      }
+      case 'spookfox-jscl': {
+        sf.registerApp('jscl', Jscl);
         break;
       }
       default:
