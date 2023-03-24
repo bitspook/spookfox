@@ -34,22 +34,24 @@
         (spookfox-tabs--request client "GET_ALL_TABS"))
        :payload))))
 
-(defun spookfox-open-new-tab ()
-  "Prompt user to select a tab and open it in spookfox browser."
-  (interactive)
-  (let ((tab (read-string "Enter URL to open or search term: " "https://"))
-        (client (cl-first spookfox--connected-clients)))
+(defun sft--open-or-search (term)
+  "Open new tab with TERM."
+  (let ((client (cl-first spookfox--connected-clients)))
     (when client
       (cond
-       ((string-match "https?:\/\/.*[\.].*" tab)
-        (spookfox-tabs--request client "OPEN_TAB" `(:url ,tab)))
+       ((string-match "https?:\/\/.*[\.].*" term)
+        (spookfox-tabs--request client "OPEN_TAB" `(:url ,term)))
        (t
-        (spookfox-tabs--request client "SEARCH_FOR" tab))))))
+        (spookfox-tabs--request client "SEARCH_FOR" term))))))
 
 (defun spookfox-switch-tab ()
-  "Like `switch-buffer' but for browser and its tabs.
+  "Like `switch-buffer' but for browser tabs.
 When you have too many tabs to find what you want; or you want to
-jump to browser with your desired tab already in focus."
+jump to browser with your desired tab already in focus. Or to open a new tab.
+
+Note that this do not bring the browser window to focus.
+Depending on the kind of system, user have to do it by themselves.
+[[https://github.com/bitspook/spookmax.d/blob/aae6c47e5def0f2bc113f22931ec27c62b5365b6/readme.org?plain=1#L1757-L1764][Example]]"
   (interactive)
   (let* ((tabs (spookfox--request-all-tabs))
          (tabs (mapcar (lambda (tab)
@@ -57,17 +59,19 @@ jump to browser with your desired tab already in focus."
                                        (propertize (plist-get tab :url) 'face 'font-lock-comment-face))
                                tab))
                        tabs))
-         (selected-tab (completing-read "Select tab: " tabs))
-         (selected-tab (alist-get selected-tab tabs nil nil #'string=))
-         (tab-id (plist-get selected-tab :id))
-         (window-id (plist-get selected-tab :windowId))
+         (read-tab (completing-read "Select tab: " tabs))
+         (selected-tab (alist-get read-tab tabs nil nil #'string=))
          (client (cl-first spookfox--connected-clients)))
-    ;; (sfjsi-eval (format "browser.tabs.update(%s, { active: true });browser.windows.update(%s, { focused: true });" tab-id window-id))
-    (sfcl-eval
-     `(progn
-        (js:browser:tabs:update ,tab-id ,(sfcl-js-obj '(("active" . t))))
-        (js:browser:windows:update ,window-id ,(sfcl-js-obj '(("focused" . t))))
-        t))))
+    (if selected-tab
+        (let ((tab-id (plist-get selected-tab :id))
+              (window-id (plist-get selected-tab :windowId)))
+          ;; (sfjsi-eval (format "browser.tabs.update(%s, { active: true });browser.windows.update(%s, { focused: true });" tab-id window-id))
+          (sfcl-eval
+           `(progn
+              (js:browser:tabs:update ,tab-id ,(sfcl-js-obj '(("active" . t))))
+              (js:browser:windows:update ,window-id ,(sfcl-js-obj '(("focused" . t))))
+              t)))
+      (sft--open-or-search read-tab))))
 
 ;;;###autoload
 (defun spookfox-tabs ()

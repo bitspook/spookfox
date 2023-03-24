@@ -42,8 +42,14 @@ https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/tabs/
           result)))))
 
 (cl-defun sfjsi-eval (js &optional (context 'background))
-  "Evaluate JS in CONTEXT.
-Supported contexts: '(background)."
+  "Evaluate JS in CONTEXT. Return the result of evaluation.
+
+Supported contexts:
+
+1. background
+
+   Eval JS in addon's background page.
+"
   (let ((client (first spookfox--connected-clients)))
     (when client
       (plist-get
