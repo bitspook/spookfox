@@ -62,7 +62,7 @@ jump to browser with your desired tab already in focus."
          (tab-id (plist-get selected-tab :id))
          (window-id (plist-get selected-tab :windowId))
          (client (cl-first spookfox--connected-clients)))
-    ;; (spookfox-tabs--request client "ACTIVATE_TAB" selected-tab)
+    ;; (sfjsi-eval (format "browser.tabs.update(%s, { active: true });browser.windows.update(%s, { focused: true });" tab-id window-id))
     (sfcl-eval
      `(progn
         (js:browser:tabs:update ,tab-id ,(sfcl-js-obj '(("active" . t))))
@@ -78,5 +78,5 @@ jump to browser with your desired tab already in focus."
 (provide 'spookfox-tabs)
 ;;; spookfox-tabs.el ends here
 ;; Local Variables:
-;; read-symbol-shorthands: (("sft-" . "spookfox-tabs-") ("sfcl-" . "spookfox-jscl-"))
+;; read-symbol-shorthands: (("sft-" . "spookfox-tabs-") ("sfcl-" . "spookfox-jscl-") ("sfjsi-" . "spookfox-js-injection-"))
 ;; End:

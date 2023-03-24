@@ -9,11 +9,11 @@
 (require 'cl-lib)
 (require 'spookfox)
 
-(defvar sf-js-injection--msg-prefix "JS_INJECT_")
+(defvar sfjsi--msg-prefix "JS_INJECT_")
 
-(defun sf-js-injection--request (&rest args)
+(defun sfjsi--request (&rest args)
   "Make spookfox-request with CLIENT and ARGS but with prefixed NAME."
-  (let ((spookfox--msg-prefix sf-js-injection--msg-prefix))
+  (let ((spookfox--msg-prefix sfjsi--msg-prefix))
     (apply #'spookfox-request args)))
 
 (defun spookfox-eval-js-in-active-tab (js &optional just-the-tip-p)
@@ -34,17 +34,33 @@ https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/tabs/
     (when client
       (let ((result (plist-get
                      (spookfox--poll-response
-                      (sf-js-injection--request
+                      (sfjsi--request
                        client "EVAL_IN_ACTIVE_TAB"
                        `((code . ,js))))
                      :payload)))
         (if just-the-tip-p (seq-first (seq-first result))
           result)))))
 
+(cl-defun sfjsi-eval (js &optional (context 'background))
+  "Evaluate JS in CONTEXT.
+Supported contexts: '(background)."
+  (let ((client (first spookfox--connected-clients)))
+    (when client
+      (plist-get
+       (spookfox--poll-response
+        (case context
+          ('background
+           (sfjsi--request client "EVAL_IN_BACKGROUND_SCRIPT" `((code . ,js))))
+          (t (error "Unsupported context: %s" context))))
+       :payload))))
+
 ;;;###autoload
 (defun spookfox-js-injection ()
-  "Initialize sf-js-injection app."
+  "Initialize spookfox-js-injection app."
   )
 
 (provide 'spookfox-js-injection)
 ;;; spookfox-js-injection.el ends here
+;; Local Variables:
+;; read-symbol-shorthands: (("sfjsi-" . "spookfox-js-injection-"))
+;; End:
