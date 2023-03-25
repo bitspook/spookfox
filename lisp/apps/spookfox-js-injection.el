@@ -30,7 +30,7 @@ example running a script which declares a variable with `let` or
 
 Details about js execution:
 https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/tabs/executeScript"
-  (let ((client (first spookfox--connected-clients)))
+  (let ((client (cl-first spookfox--connected-clients)))
     (when client
       (let ((result (plist-get
                      (spookfox--poll-response
@@ -50,11 +50,11 @@ Supported contexts:
 
    Eval JS in addon's background page.
 "
-  (let ((client (first spookfox--connected-clients)))
+  (let ((client (cl-first spookfox--connected-clients)))
     (when client
       (plist-get
        (spookfox--poll-response
-        (case context
+        (cl-case context
           (background
            (sfjsi--request client "EVAL_IN_BACKGROUND_SCRIPT" `((code . ,js))))
           (t (error "Unsupported context: %s" context))))
