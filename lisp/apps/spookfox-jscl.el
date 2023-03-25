@@ -35,7 +35,7 @@ because emacs-lisp do not allow writing #j: forms, even in quoted
 form."
   (let ((client (cl-first spookfox--connected-clients))
         (str-form (string-replace "(js:" "(#j:" (prin1-to-string form))))
-    (case context
+    (cl-case context
       (background
        (when client
          (plist-get
