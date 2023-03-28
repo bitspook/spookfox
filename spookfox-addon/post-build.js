@@ -8,15 +8,16 @@ const manifestPath = './dist/manifest.json';
  * through parcel, jscl seem to start throwing some errors.
  */
 const addJscl = async () => {
-  const jsclSrcPath = './src/apps/Jscl/jscl.js';
+  const jsclSrcPath = './src/apps/Jscl/jscl';
   const jsclDestPath = './dist/apps/Jscl/jscl.js';
+  const jsclManifestPath = 'apps/Jscl/jscs.js';
 
   await fs.copyFile(jsclSrcPath, jsclDestPath);
   let manifest = await fs.readFile(manifestPath);
   manifest = JSON.parse(manifest);
 
-  if (manifest.background.scripts.indexOf('apps/Jscl/jscs.js') < 0)
-    manifest.background.scripts.push('apps/Jscl/jscl.js');
+  if (manifest.background.scripts.indexOf(jsclManifestPath) < 0)
+    manifest.background.scripts.push(jsclManifestPath);
 
   await fs.writeFile(manifestPath, JSON.stringify(manifest));
 };
