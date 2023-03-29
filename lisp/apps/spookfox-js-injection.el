@@ -16,7 +16,7 @@
   (let ((spookfox--msg-prefix sfjsi--msg-prefix))
     (apply #'spookfox-request args)))
 
-(defun spookfox-eval-js-in-active-tab (js &optional just-the-tip-p)
+(defun sfjsi-eval-in-active-tab (js &optional just-the-tip-p)
   "Evaluate JS in active firefox tab.
 Return value is a list of lists. Browser can have multiple active
 tabs (one per window). Every active tab can have multiple frames.
@@ -41,13 +41,15 @@ https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/tabs/
         (if just-the-tip-p (seq-first (seq-first result))
           result)))))
 
+(defalias 'spookfox-eval-js-in-active-tab 'sfjsi-eval-in-active-tab)
+(make-obsolete 'spookfox-eval-js-in-active-tab 'sfjsi-eval-in-active-tab 'v0.3.0)
+
 (cl-defun sfjsi-eval (js &optional (context 'background))
   "Evaluate JS in CONTEXT. Return the result of evaluation.
 
 Supported contexts:
 
 1. background
-
    Eval JS in addon's background page.
 "
   (let ((client (cl-first spookfox--connected-clients)))
