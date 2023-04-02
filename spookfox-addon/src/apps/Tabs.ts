@@ -1,4 +1,5 @@
 import { Draft, Immutable } from 'immer';
+import browser from 'webextension-polyfill';
 import { SFApp, Spookfox } from '~src/Spookfox';
 
 export type TabsState = Immutable<null>;

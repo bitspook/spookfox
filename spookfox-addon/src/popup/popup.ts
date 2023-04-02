@@ -2,7 +2,7 @@ const button = document.querySelector('.reconnect');
 const statusDot = document.querySelector('.status > #dot');
 const statusMsg = document.querySelector('.status > #msg');
 
-const reconnect = async (port: browser.runtime.Port) => {
+const reconnect = async (port: browser.Runtime.Port) => {
   port.postMessage({ type: 'RECONNECT' });
 };
 

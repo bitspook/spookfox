@@ -1,4 +1,5 @@
 import { Draft, freeze, Immutable } from 'immer';
+import browser from 'webextension-polyfill';
 import { SFApp, SFEvent, SFEvents, Spookfox } from '~src/Spookfox';
 import { sleep } from '~src/lib';
 import iconChainDark from '../icons/chained-dark.svg';
@@ -65,7 +66,7 @@ export interface OpenTab {
  * to communicate with Emacs.
  */
 export const fromBrowserTab = (
-  tab: Partial<browser.tabs.Tab & OpenTab>
+  tab: Partial<browser.Tabs.Tab & OpenTab>
 ): SavedTab => {
   return {
     id: tab.savedTabId,
@@ -115,7 +116,7 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
   addBrowserPageAction = () => {
     const sf = this.sf;
 
-    const handlePageAction = async (t: browser.tabs.Tab) => {
+    const handlePageAction = async (t: browser.Tabs.Tab) => {
       const state = (sf.state as any)[this.name] as OrgTabsState;
       const openedTab = state.openTabs[t.id];
       const localSavedTab = state.savedTabs[openedTab?.savedTabId] || {};
@@ -255,7 +256,7 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
     return openedTabs;
   };
 
-  private handleNewTab = async (tab: browser.tabs.Tab) => {
+  private handleNewTab = async (tab: browser.Tabs.Tab) => {
     this.dispatch(Actions.SAVE_TAB_START, tab.id);
 
     // This might be one of the places where browser compatibility is an issue
@@ -290,7 +291,7 @@ export default class OrgTabs implements SFApp<OrgTabsState> {
       audible?: boolean;
       discarded?: boolean;
       favIconUrl?: string;
-      mutedInfo?: browser.tabs.MutedInfo;
+      mutedInfo?: browser.Tabs.MutedInfo;
       pinned?: boolean;
       status?: string;
       title?: string;
