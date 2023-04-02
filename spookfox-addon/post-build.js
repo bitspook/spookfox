@@ -10,7 +10,7 @@ const manifestPath = './dist/manifest.json';
 const addJscl = async () => {
   const jsclSrcPath = './src/apps/Jscl/jscl';
   const jsclDestPath = './dist/apps/Jscl/jscl.js';
-  const jsclManifestPath = 'apps/Jscl/jscs.js';
+  const jsclManifestPath = 'apps/Jscl/jscl.js';
 
   await fs.copyFile(jsclSrcPath, jsclDestPath);
   let manifest = await fs.readFile(manifestPath);

@@ -6,9 +6,10 @@ import Tabs from './apps/Tabs';
 import OrgTabs from './apps/OrgTabs';
 import JsInject from './apps/JsInject';
 import Jscl from './apps/Jscl';
+import browser from 'webextension-polyfill';
 
 let autoConnectInterval = null;
-let connectedPorts: browser.runtime.Port[] = [];
+let connectedPorts: browser.Runtime.Port[] = [];
 
 // Messages from content script
 browser.runtime.onMessage.addListener(

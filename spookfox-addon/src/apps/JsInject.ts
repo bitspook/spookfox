@@ -1,4 +1,5 @@
 import { Draft, Immutable } from 'immer';
+import browser from 'webextension-polyfill';
 import { SFApp, Spookfox } from '~src/Spookfox';
 
 export type JsInjectState = Immutable<null>;
@@ -29,7 +30,7 @@ export default class JsInject implements SFApp<JsInjectState> {
    * Inject Javascript sent by Emacs into active tab and send whatever it
    * returns as response.
    */
-  evalJsInActiveTab = async (script: browser.extensionTypes.InjectDetails) => {
+  evalJsInActiveTab = async (script: browser.ExtensionTypes.InjectDetails) => {
     const activeTabs = await browser.tabs.query({ active: true });
     if (!activeTabs.length) {
       throw new Error(

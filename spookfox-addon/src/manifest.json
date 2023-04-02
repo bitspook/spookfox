@@ -13,15 +13,20 @@
     }
   },
   "background": {
-    "scripts": ["./background.ts"]
+    "scripts": [
+      "../node_modules/webextension-polyfill/dist/browser-polyfill.js",
+      "./background.ts"
+    ]
   },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content.ts"]
+      "js": [
+        "../node_modules/webextension-polyfill/dist/browser-polyfill.js",
+        "content.ts"
+      ]
     }
   ],
-  "page_action": {},
   "browser_action": {
     "default_icon": "icons/emacs-mono.svg",
     "default_title": "Spookfox",
