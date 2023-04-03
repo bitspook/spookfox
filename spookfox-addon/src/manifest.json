@@ -1,12 +1,17 @@
 {
-  "description": "Make Firefox speak to Emacs",
+  "description": "Make web-browsers speak to Emacs",
   "manifest_version": 2,
   "name": "Spookfox",
   "version": "0.3.0",
   "icons": {
-    "48": "icons/chained-dark.svg"
+    "48": "icons/emacs-color.png",
+    "96": "icons/emacs-color@2x.png",
+    "192": "icons/emacs-color@4x.png"
   },
   "browser_specific_settings": {
+    "chrome": {
+      "id": "kkmebdchecbibghcdoohhffiogjcfcno"
+    },
     "gecko": {
       "id": "spookfox@bitspook.in",
       "strict_min_version": "70.0"
@@ -28,7 +33,11 @@
     }
   ],
   "browser_action": {
-    "default_icon": "icons/emacs-mono.svg",
+    "default_icon": {
+      "48": "icons/emacs-mono.png",
+      "96": "icons/emacs-color@4x.png",
+      "192": "icons/emacs-mono@2x.png"
+    },
     "default_title": "Spookfox",
     "default_popup": "popup/global.html"
   },
