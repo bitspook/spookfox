@@ -1,10 +1,10 @@
 name: Build and release
 
 on:
-  - workflow_dispatch
-  - push:
-      tags:
-        - "v*.*.*"
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*.*.*"
 
 jobs:
   build:
@@ -21,25 +21,10 @@ jobs:
       - run: yarn
         working-directory: spookfox-addon
 
-      - run: cat "${{secrets.CHROME_PRIVATE_KEY}} > key.pem"
+      - run: echo "${{secrets.CHROME_PRIVATE_KEY}} > key.pem"
         working-directory: spookfox-addon
 
       - run: yarn build
-        working-directory: spookfox-addon
-
-  publish_firefox_addon:
-    name: Build and publish Firefox addon
-    environment: build
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v1
-
-      - uses: actions/setup-node@v2
-        with:
-          node-version: '16.x'
-
-      - run: yarn
         working-directory: spookfox-addon
 
       - run: yarn publish:ff-unlisted
@@ -48,26 +33,15 @@ jobs:
           FIREFOX_ADDON_KEY: "${{ secrets.FIREFOX_ADDON_KEY }}"
           FIREFOX_ADDON_SECRET: "${{ secrets.FIREFOX_ADDON_SECRET }}"
 
-      - uses: actions/upload-artifact@v2
-        with:
-          name: spookfox-addon
-          path: spookfox-addon/addons-dist/*.xpi
+      - run: mv ./addons-dist/*.xpi ./addons-dist/spookfox-ff.xpi
+        working-directory: spookfox-addon
 
-  release:
-    name: Create a release
-    runs-on: ubuntu-latest
-    needs:
-      - publish_firefox_addon
-    steps:
-      - uses: actions/download-artifact@v3
-        name: Download spookfox-native and spookfox-addon
-        with:
-          path: ./release
-
-      - run: mv ./release/spookfox-addon/*.xpi ./release/spookfox-firefox.xpi
+      - run: mv ./addons-dist/*.crx ./addons-dist/spookfox-chrome.crx
+        working-directory: spookfox-addon
 
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            ./release/spookfox-firefox.xpi
+            ./spookfox-addon/addons-dist/spookfox-ff.xpi
+            ./spookfox-addon/addons-dist/spookfox-chrome.crx
