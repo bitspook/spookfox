@@ -6,19 +6,20 @@ lint:
 
 yarn_version := $(shell cat spookfox-addon/package.json | grep -o '"version": ".*"' | tr -d '[:blank:]"' | cut -d ':' -f 2)
 addon_version := $(shell cat spookfox-addon/src/manifest.json | grep -o '"version": ".*"' | tr -d '[:blank:]"' | cut -d ':' -f 2)
+el_pkg_version := $(shell cat lisp/spookfox.el | grep 'Version:.*' | grep -o '[0-9\.]*')
 el_version := $(shell cat lisp/spookfox.el | grep 'defvar.*version' | grep -o '[0-9\.]*')
 
 master_version := $(shell git show master:spookfox-addon/package.json | grep 'version' | grep -o '"[0-9\.]*"')
 
 version-check:
-ifneq ($(filter-out $(yarn_version), $(addon_version) $(el_version)),)
-	$(error "Versions don't match. manifest.json, package.json and spookfox.el must have same version.")
+ifneq ($(filter-out $(yarn_version), $(addon_version) $(el_version) $(el_pkg_version)),)
+		$(error "Versions don't match. manifest.json, package.json and spookfox.el must have same version.")
 else ifeq ($(yarn_version),$(master_version))
-	$(error "Please bump the version. We will not be able to release same version again")
+		$(error "Please bump the version. We will not be able to release same version again")
 else ifeq ($(shell git describe --tag --abbrev=0 2> /dev/null),)
-	$(error "Please set a tag to release on HEAD.")
+		$(error "Please set a tag to release on HEAD.")
 else
-	@echo "Versions look ok."
+		@echo "Versions look ok."
 endif
 
 version-set:
