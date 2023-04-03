@@ -1,10 +1,17 @@
 * Spookfox
 
-Communicate between Firefox and Emacs. Because [[https://nyxt.atlas.engineer/][Nyxt]] is just not there yet.
+Communicate between Firefox/Chrome and Emacs. Because [[https://nyxt.atlas.engineer/][Nyxt]] is just not there yet.
 
 #+begin_quote
 ⚠️ Caution: Spookfox is in early development and I am making breaking changes all
 over the place.
+#+end_quote
+
+#+begin_quote
+⚠️ Caution: Although Chromium is supported and a .crx file is generated in build,
+Chrome won't let you install and use it. Stop using Chrome. PS You'll have to
+drag-n-drop the downloaded crx file to Chrome to even install it, because
+Google.
 #+end_quote
 
 For installation, usage, and more; please visit the [[https://bitspook.in/projects/spookfox][project page]].

@@ -18,7 +18,7 @@ jobs:
         with:
           node-version: '16.x'
 
-      - run: yarn
+      - run: yarn install --frozen-lockfile
         working-directory: spookfox-addon
 
       - run: echo "${{secrets.CHROME_PRIVATE_KEY}} > key.pem"
