@@ -11,7 +11,7 @@
     "build:addon": "mkdir -p ./addons-dist && yarn build:chrome && yarn build:ff",
     "build:unpackaged": "parcel build src/manifest.json 'src/apps/**/*.ts' && node ./post-build.js",
     "build": "yarn clean && yarn build:unpackaged && yarn build:addon",
-    "publish:ff-unlisted": "yarn build && web-ext -s ./dist -a ./dist/addons --api-key $FIREFOX_ADDON_KEY --api-secret $FIREFOX_ADDON_SECRET sign --channel=unlisted"
+    "publish:ff-unlisted": "web-ext -s ./dist -a ./dist/addons --api-key $FIREFOX_ADDON_KEY --api-secret $FIREFOX_ADDON_SECRET sign --channel=unlisted"
   },
   "devDependencies": {
     "@parcel/config-webextension": "^2.3.2",

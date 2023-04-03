@@ -1,11 +1,32 @@
 name: Build and release
 
 on:
-  push:
-    tags:
-      - "v*.*.*"
+  - workflow_dispatch
+  - push:
+      tags:
+        - "v*.*.*"
 
 jobs:
+  build:
+    environment: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v1
+
+      - uses: actions/setup-node@v2
+        with:
+          node-version: '16.x'
+
+      - run: yarn
+        working-directory: spookfox-addon
+
+      - run: cat "${{secrets.CHROME_PRIVATE_KEY}} > key.pem"
+        working-directory: spookfox-addon
+
+      - run: yarn build
+        working-directory: spookfox-addon
+
   publish_firefox_addon:
     name: Build and publish Firefox addon
     environment: build
@@ -21,7 +42,7 @@ jobs:
       - run: yarn
         working-directory: spookfox-addon
 
-      - run: yarn publish-unlisted-addon
+      - run: yarn publish:ff-unlisted
         working-directory: spookfox-addon
         env:
           FIREFOX_ADDON_KEY: "${{ secrets.FIREFOX_ADDON_KEY }}"
@@ -30,7 +51,7 @@ jobs:
       - uses: actions/upload-artifact@v2
         with:
           name: spookfox-addon
-          path: spookfox-addon/dist/addons/*.xpi
+          path: spookfox-addon/addons-dist/*.xpi
 
   release:
     name: Create a release
