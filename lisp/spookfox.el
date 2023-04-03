@@ -5,7 +5,7 @@
 ;; Author: bitspook
 ;; Homepage: https://github.com/bitspook/spookfox
 ;; Keywords: Firefox
-;; Version: 0.3.1
+;; Version: 0.3.2
 ;; Package-Requires: ((websocket "1.13"))
 ;;
 ;;; Commentary:
@@ -24,7 +24,7 @@
 (require 'org-id)
 (require 'websocket)
 
-(defvar spookfox-version "0.3.1"
+(defvar spookfox-version "0.3.2"
   "Spookfox version.")
 (defvar spookfox-enabled-apps nil)
 (defvar spookfox--responses nil
