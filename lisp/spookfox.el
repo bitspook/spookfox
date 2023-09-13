@@ -38,6 +38,8 @@
 (defvar spookfox--server-process nil)
 (defvar spookfox--msg-prefix ""
   "String to prefix names of messages sent by `spookfox-request'.")
+(defvar spookfox-debug nil
+  "When non-nil, spookfox will log its communication in *spookfox* buffer.")
 
 ;; lib
 (defun spookfox--string-blank-p (str)
@@ -48,9 +50,10 @@ Considers hard-space (ASCII 160) as space."
 
 (defun spookfox--log (msg &rest args)
   "Log a MSG formatted with ARGS to *spookfox* buffer."
-  (with-current-buffer (get-buffer-create "*spookfox*")
-    (goto-char (point-max))
-    (insert (apply #'format (concat "\n" msg) args))))
+  (when spookfox-debug
+    (with-current-buffer (get-buffer-create "*spookfox*")
+      (goto-char (point-max))
+      (insert (apply #'format (concat "\n" msg) args)))))
 
 (defun spookfox--handle-new-client (ws)
   "When a new client connects, save the connected websocket WS."
