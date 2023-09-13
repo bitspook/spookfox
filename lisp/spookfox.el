@@ -1,9 +1,9 @@
-;;; package --- Communicate with a browser which have spookfox browser addon installed. -*- lexical-binding: t -*-
+;;; spookfox --- Communicate with a browser which have spookfox browser addon installed. -*- lexical-binding: t -*-
 ;;;
 ;; Copyright © 2022 bitspook
 ;;
 ;; Author: bitspook
-;; Homepage: https://github.com/bitspook/spookfox
+;; Homepage: https://bitspook.in/projects/spookfox
 ;; Keywords: Firefox
 ;; Version: 0.3.2
 ;; Package-Requires: ((websocket "1.13"))
@@ -96,11 +96,7 @@ request-id as key."
         ;; `spookfox--responses'. We should implement a fixed-length data
         ;; structure; so even if nobody polls for a response, old responses
         ;; don't just keep lying around in `spookfox--responses'
-        (push (cons (or (plist-get msg :requestId)
-                        ;; FIXME
-                        ;; Backward Compatibility with 0.2.0
-                        ;; 0.2.0 Spookfox.ts used to send "id" instead of "requestId" in responses
-                        (plist-get msg :id)) msg) spookfox--responses)))))
+        (push (cons (plist-get msg :requestId) msg) spookfox--responses)))))
 
 (defun spookfox-start-server ()
   "Start websockets server."
@@ -146,16 +142,16 @@ corresponding to this request."
     (spookfox-request ws name payload)))
 
 (defun spookfox--poll-response (request-id &optional retry-count)
-  "Synchronously provide response for reuqest with id REQUEST-ID.
+  "Synchronously provide response for request with id REQUEST-ID.
 Returns a plist obtained by decoding the response. Since
 socket-communication with spookfox is async, this function blocks
 Emacs for maximum 1 second. If it don't receive a response in
 that time, it returns `nil`. RETRY-COUNT is for internal use, for
 reaching exit condition in recursive re-checks."
   (cl-block spookfox--poll-response
-    (let ((msg (alist-get request-id spookfox--responses nil nil 'equal))
+    (let ((msg (cdr (assoc request-id spookfox--responses 'equal)))
           (retry-count (or retry-count 0)))
-      (when (> retry-count 5)
+      (when (> retry-count 10)
         (cl-return-from spookfox--poll-response))
       (when (not msg)
         (sleep-for 0 200)
@@ -203,4 +199,3 @@ Return value of HANDLER is sent back to browser as response."
   (spookfox-start-server))
 
 (provide 'spookfox)
-;;; spookfox.el ends here
