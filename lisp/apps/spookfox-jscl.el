@@ -28,7 +28,7 @@
 ;; thing working. Perhaps you can come up with a better name?
 (cl-defun sfcl-eval (form &optional (context 'background))
   "Evaluate LISP FORM in background script in CONTEXT.
-CONTEXT can be one of '(background ).
+CONTEXT can be one of (background).
 
 Note: JSCL uses #j: for FFI, but FORM must use `js:` for that,
 because emacs-lisp do not allow writing #j: forms, even in quoted

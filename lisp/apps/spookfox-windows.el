@@ -1,12 +1,9 @@
-;;; spookfox-tabs -- Spookfox app which provide access to browser's tabs -*- lexical-binding: t -*-
+;;; spookfox-windows -- Spookfox app which provide access to browser's windows -*- lexical-binding: t -*-
 
 ;;; Commentary:
-;; Access browser tabs from Emacs
+;; Access browser windows from Emacs
 
 ;;; Code:
-(require 'org)
-(require 'org-id)
-(require 'cl-lib)
 (require 'spookfox)
 
 (defvar sfw--msg-prefix "WINDOWS")

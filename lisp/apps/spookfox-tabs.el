@@ -9,7 +9,6 @@
 (require 'cl-lib)
 (require 'spookfox)
 (require 'spookfox-jscl)
-(require 'spookfox-windows)
 
 (defvar spookfox-tabs--msg-prefix "T_")
 
@@ -45,6 +44,7 @@
        (t
         (spookfox-tabs--request client "SEARCH_FOR" term))))))
 
+;;;###autoload
 (defun spookfox-switch-tab ()
   "Like `switch-buffer' but for browser tabs.
 When you have too many tabs to find what you want; or you want to
@@ -61,8 +61,7 @@ Depending on the kind of system, user have to do it by themselves.
                                tab))
                        tabs))
          (read-tab (completing-read "Select tab: " tabs))
-         (selected-tab (alist-get read-tab tabs nil nil #'string=))
-         (client (cl-first spookfox--connected-clients)))
+         (selected-tab (alist-get read-tab tabs nil nil #'string=)))
     (if selected-tab
         (let ((tab-id (plist-get selected-tab :id))
               (window-id (plist-get selected-tab :windowId)))
@@ -77,7 +76,7 @@ Depending on the kind of system, user have to do it by themselves.
 ;;;###autoload
 (defvar spookfox-tabs
   `(:name spookfox-tabs
-    :dependencies (,spookfox-jscl ,spookfox-windows)))
+    :dependencies (,spookfox-jscl)))
 
 (provide 'spookfox-tabs)
 ;;; spookfox-tabs.el ends here

@@ -201,20 +201,20 @@ Return value of HANDLER is sent back to browser as response."
 
 (defun spookfox-init ()
   "Initialize spookfox with enabled apps."
-  (cl-labels ((is-app-eql ((a b)
-                           (eq (plist-get a :name)
-                               (plist-get b :name)))))
-    (let ((flattened-apps
-           (let ((accum nil))
-             (dolist (app spookfox-enabled-apps accum)
-               (dolist (dep (plist-get app :dependencies))
-                 (add-to-list 'accum dep t)
-                 #'is-app-eql)
-               (add-to-list 'accum app t)))))
-      (setf spookfox--active-apps flattened-apps)
-      (dolist (app flattened-apps)
-        (when-let ((on-init (plist-get app :on-init)))
-          (funcall on-init)))))
+  (let* ((is-app-eql (lambda (a b)
+                       (eql (plist-get a :name)
+                            (plist-get b :name))))
+         (flattened-apps
+          (let ((accum nil))
+            (dolist (app spookfox-enabled-apps (reverse accum))
+              (dolist (dep (plist-get app :dependencies))
+                (cl-pushnew dep accum :test is-app-eql))
+              (cl-pushnew app accum :test is-app-eql)))))
+
+    (setf spookfox--active-apps flattened-apps)
+    (dolist (app flattened-apps)
+      (when-let ((on-init (plist-get app :on-init)))
+        (funcall on-init))))
 
   (spookfox-start-server))
 
