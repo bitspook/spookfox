@@ -2,7 +2,7 @@
   "description": "Make web-browsers speak to Emacs",
   "manifest_version": 2,
   "name": "Spookfox",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "icons": {
     "48": "icons/emacs-color.png",
     "96": "icons/emacs-color@2x.png",
