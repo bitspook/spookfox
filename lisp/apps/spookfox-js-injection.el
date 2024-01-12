@@ -63,9 +63,7 @@ Supported contexts:
        :payload))))
 
 ;;;###autoload
-(defun spookfox-js-injection ()
-  "Initialize spookfox-js-injection app."
-  )
+(defvar spookfox-js-injection '(:name spookfox-js-injection))
 
 (provide 'spookfox-js-injection)
 ;;; spookfox-js-injection.el ends here

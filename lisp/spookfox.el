@@ -26,7 +26,8 @@
 
 (defvar spookfox-version "0.3.2"
   "Spookfox version.")
-(defvar spookfox-enabled-apps nil)
+(defvar spookfox-enabled-apps nil
+  "List of Spookfox Apps that should be enabled in all new clients.")
 (defvar spookfox--responses nil
   "Alist of responses received. Key is the request-id, val is the response.")
 (defvar spookfox--req-handlers-alist nil
@@ -40,6 +41,10 @@
   "String to prefix names of messages sent by `spookfox-request'.")
 (defvar spookfox-debug nil
   "When non-nil, spookfox will log its communication in *spookfox* buffer.")
+(defvar spookfox--active-apps
+  "List of actually active apps. This is same as
+spookfox-enabled-apps, but also has dependencies of enabled-apps
+resolved.")
 
 ;; lib
 (defun spookfox--string-blank-p (str)
@@ -58,8 +63,8 @@ Considers hard-space (ASCII 160) as space."
 (defun spookfox--handle-new-client (ws)
   "When a new client connects, save the connected websocket WS."
   (push ws spookfox--connected-clients)
-  (dolist (app spookfox-enabled-apps)
-    (spookfox-request ws 'enable-app app))
+  (dolist (app spookfox--active-apps)
+    (spookfox-request ws 'enable-app (plist-get app :name)))
   (spookfox--log "[CONNECTED] Total clients: %s" (length spookfox--connected-clients)))
 
 (defun spookfox--handle-disconnect-client (ws)
@@ -157,7 +162,7 @@ reaching exit condition in recursive re-checks."
       (when (> retry-count 10)
         (cl-return-from spookfox--poll-response))
       (when (not msg)
-        (sleep-for 0 200)
+        (sleep-for 0 50)
         (cl-return-from spookfox--poll-response (spookfox--poll-response request-id (1+ retry-count))))
       (setf spookfox--responses (delq (assoc request-id spookfox--responses 'equal) spookfox--responses))
       msg)))
@@ -196,8 +201,20 @@ Return value of HANDLER is sent back to browser as response."
 
 (defun spookfox-init ()
   "Initialize spookfox with enabled apps."
-  (dolist (app spookfox-enabled-apps)
-    (funcall app))
+  (cl-labels ((is-app-eql ((a b)
+                           (eq (plist-get a :name)
+                               (plist-get b :name)))))
+    (let ((flattened-apps
+           (let ((accum nil))
+             (dolist (app spookfox-enabled-apps accum)
+               (dolist (dep (plist-get app :dependencies))
+                 (add-to-list 'accum dep t)
+                 #'is-app-eql)
+               (add-to-list 'accum app t)))))
+      (setf spookfox--active-apps flattened-apps)
+      (dolist (app flattened-apps)
+        (when-let ((on-init (plist-get app :on-init)))
+          (funcall on-init)))))
 
   (spookfox-start-server))
 

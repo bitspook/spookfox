@@ -272,13 +272,15 @@ make changes."
         (concat "[" (string-join (mapcar #'json-encode group-tabs) ",") "]"))))))
 
 ;;;###autoload
-(defun spookfox-org-tabs ()
+(defun spookfox-org-tabs--on-init ()
   "Initialize spookfox-org-tabs app."
   (let ((spookfox--msg-prefix spookfox-org-tabs--msg-prefix))
     (spookfox--register-req-handler "TOGGLE_TAB_CHAINING" #'spookfox-org-tabs--handle-toggle-tab-chaining)
     (spookfox--register-req-handler "GET_SAVED_TABS" #'spookfox-org-tabs--handle-get-saved-tabs)
     (spookfox--register-req-handler "REMOVE_TAB" #'spookfox-org-tabs--handle-remove-tab)
     (spookfox--register-req-handler "UPDATE_TAB" #'spookfox-org-tabs--handle-update-tab)))
+
+(defvar spookfox-org-tabs (list :name 'spookfox-org-tabs :on-init #'spookfox-org-tabs--on-init))
 
 (provide 'spookfox-org-tabs)
 ;;; spookfox-org-tabs.el ends here

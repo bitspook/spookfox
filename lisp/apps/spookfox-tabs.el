@@ -9,6 +9,7 @@
 (require 'cl-lib)
 (require 'spookfox)
 (require 'spookfox-jscl)
+(require 'spookfox-windows)
 
 (defvar spookfox-tabs--msg-prefix "T_")
 
@@ -74,10 +75,9 @@ Depending on the kind of system, user have to do it by themselves.
       (sft--open-or-search read-tab))))
 
 ;;;###autoload
-(defun spookfox-tabs ()
-  "Initialize spookfox-tabs app."
-  ;; We need spookfox-jscl to do some work
-  (spookfox-jscl))
+(defvar spookfox-tabs
+  `(:name spookfox-tabs
+    :dependencies (,spookfox-jscl ,spookfox-windows)))
 
 (provide 'spookfox-tabs)
 ;;; spookfox-tabs.el ends here

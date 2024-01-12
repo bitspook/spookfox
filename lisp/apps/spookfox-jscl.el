@@ -52,10 +52,8 @@ form."
         alist))))
 
 ;;;###autoload
-(defun spookfox-jscl ()
-  "Initialize spookfox-jscl app."
-  ;; Pass. Nothing to initialize.
-  )
+(defvar spookfox-jscl
+  `(:name spookfox-jscl))
 
 (provide 'spookfox-jscl)
 ;;; spookfox-jscl.el ends here

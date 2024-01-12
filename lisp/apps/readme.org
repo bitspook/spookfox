@@ -1,0 +1,15 @@
+* Spookfox Apps
+
+A Spookfox app is a plist with following properties
+
+#+begin_src elisp
+  `(:name symbol
+    :on-init function
+    :dependencies (other-app another-app))
+#+end_src
+
+1. =:name= is name of the app. This will be sent to Spookfox clients (i.e browser addon) to enable
+   the app.
+2. =:on-init= is a function which is executed when spookfox is initialized, *before* any client is
+   connected.
+3. =:dependencies= is list of spookfox-apps which should be initialized before this app

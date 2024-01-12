@@ -7,6 +7,7 @@ import OrgTabs from './apps/OrgTabs';
 import JsInject from './apps/JsInject';
 import Jscl from './apps/Jscl';
 import browser from 'webextension-polyfill';
+import Windows from './apps/Windows';
 
 let autoConnectInterval = null;
 let connectedPorts: browser.Runtime.Port[] = [];
@@ -94,6 +95,10 @@ const run = async () => {
       }
       case 'spookfox-jscl': {
         sf.registerApp('jscl', Jscl);
+        break;
+      }
+      case 'spookfox-windows': {
+        sf.registerApp('spookfox-windows', Windows);
         break;
       }
       default:
