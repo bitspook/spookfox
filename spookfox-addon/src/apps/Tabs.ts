@@ -4,6 +4,13 @@ import { SFApp, Spookfox } from '~src/Spookfox';
 
 export type TabsState = Immutable<null>;
 
+export interface SFTab {
+  id: number;
+  url: string;
+  title: string;
+  windowId: number;
+}
+
 export default class Tabs implements SFApp<TabsState> {
   initialState: Immutable<TabsState> = null;
 
@@ -20,6 +27,15 @@ export default class Tabs implements SFApp<TabsState> {
     sf.registerReqHandler(EmacsRequests.GET_ALL_TABS, this.getAllTabs);
     sf.registerReqHandler(EmacsRequests.OPEN_TAB, this.openTab);
     sf.registerReqHandler(EmacsRequests.SEARCH_FOR, this.openSearchTab);
+  }
+
+  serializeTab(tab: browser.Tabs.Tab): SFTab {
+    return {
+      id: tab.id,
+      url: tab.url,
+      title: tab.title,
+      windowId: tab.windowId,
+    };
   }
 
   async currentWindowId() {
@@ -58,10 +74,22 @@ export default class Tabs implements SFApp<TabsState> {
    * same semantics as `getActiveTab`
    */
   getAllTabs = async (msg: { windowId?: number } = {}): Promise<any[]> => {
-    const windowId = (msg || {}).windowId || (await this.currentWindowId());
-    const tabs = await browser.tabs.query({ windowId });
+    const windowId = (msg || {}).windowId;
+    let tabs: browser.Tabs.Tab[] = [];
+    if (windowId) {
+      tabs = await browser.tabs.query({ windowId });
+    } else {
+      const allWindows = await browser.windows.getAll();
+      tabs = (
+        await Promise.all(
+          allWindows.map(({ id }) => {
+            return browser.tabs.query({ windowId: id });
+          })
+        )
+      ).flat();
+    }
 
-    return tabs;
+    return tabs.map(this.serializeTab);
   };
 
   openTab = async (p: { url: string }): Promise<any> => {
