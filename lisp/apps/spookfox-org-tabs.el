@@ -8,6 +8,7 @@
 (require 'org-id)
 (require 'cl-lib)
 (require 'spookfox)
+(require 'spookfox-tabs)
 
 (defvar spookfox-saved-tabs-target `(file+headline ,(expand-file-name "spookfox.org" user-emacs-directory) "Tabs")
   "Target parse-able by org-capture-template where browser tabs will be saved.")
@@ -38,12 +39,7 @@
 
 (defun spookfox-org-tabs--request-all-tabs ()
   "Get all tabs currently present in browser."
-  (let ((client (cl-first spookfox--connected-clients)))
-    (when client
-      (plist-get
-       (spookfox--poll-response
-        (spookfox-org-tabs--request client "GET_ALL_TABS"))
-       :payload))))
+  (spookfox--request-all-tabs))
 
 (defun spookfox-org-tabs--insert-tab (tab)
   "Insert browser TAB as a new org-mode-subtree."
@@ -280,7 +276,9 @@ make changes."
     (spookfox--register-req-handler "REMOVE_TAB" #'spookfox-org-tabs--handle-remove-tab)
     (spookfox--register-req-handler "UPDATE_TAB" #'spookfox-org-tabs--handle-update-tab)))
 
-(defvar spookfox-org-tabs (list :name 'spookfox-org-tabs :on-init #'spookfox-org-tabs--on-init))
+(defvar spookfox-org-tabs (list :name 'spookfox-org-tabs
+                                :on-init #'spookfox-org-tabs--on-init
+                                :dependencies (list spookfox-tabs)))
 
 (provide 'spookfox-org-tabs)
 ;;; spookfox-org-tabs.el ends here
