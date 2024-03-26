@@ -25,5 +25,5 @@
 (provide 'spookfox-windows)
 ;;; spookfox-windows.el ends here
 ;; Local Variables:
-;; read-symbol-shorthands: ("sfw-" . "spookfox-windows-"))
+;; read-symbol-shorthands: (("sfw-" . "spookfox-windows-"))
 ;; End:
