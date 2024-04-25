@@ -212,10 +212,16 @@ Return value of HANDLER is sent back to browser as response."
               (cl-pushnew app accum :test is-app-eql)))))
 
     (setf spookfox--active-apps flattened-apps)
-    (dolist (app flattened-apps)
+    (dolist (app spookfox--active-apps)
+      (require (plist-get app :name))
       (when-let ((on-init (plist-get app :on-init)))
         (funcall on-init))))
 
   (spookfox-start-server))
+
+(defun spookfox-shutdown ()
+  "Stop spookfox."
+  (interactive)
+  (spookfox-stop-server))
 
 (provide 'spookfox)
