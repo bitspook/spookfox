@@ -1,0 +1,31 @@
+** v0.5.0
+
+- Extended [[https://github.com/bitspook/spookfox/blob/ed35f2d57a9021ad62871ed9eb3f8eedf0d3521e/lisp/apps/spookfox-js-injection.el#L65][spookfox-js-injection-eval]] to run JS in user selected tabs. Inspired by [[https://github.com/bitspook/spookfox/issues/38][#38]]
+
+  spookfox-js-injection-eval now support ='tab= context, and additional =select-tab=p= argument.
+  =select-tab-p= is a lambda which receives each open browser tab from all connected spookfox
+  clients (i.e all browser windows) as a plist of shape =(:id :url :windowId :title)=. =js= is
+  injected into each tab for which =select-tab-p= returns non-nil value, their results are
+  collected, and returned to lisp in Emacs.
+
+  E.g following code to run a script in all tabs which are visiting =bitspook.in=:
+
+  #+begin_src elisp
+    (spookfox-js-injection-eval
+     "console.log('Hello from Emacs'); 5 + 5;"
+     'tab
+     (lambda (tab)
+       (s-contains-p "bitspook.in" (plist-get tab :url))))
+    ;; => ((:tab (:id 35 :url "https://bitspook.in/projects/spookfox/" :title "Spookfox" :windowId 1) :result [10]))
+  #+end_src
+
+** v0.4.1
+
+- Fix behavior of [[https://github.com/bitspook/spookfox/blob/ed35f2d57a9021ad62871ed9eb3f8eedf0d3521e/lisp/apps/spookfox-js-injection.el#L19][spookfox-js-injection-eval-in-active-tab]] in response to [[https://github.com/bitspook/spookfox/issues/37][#37]]
+
+  This function is meant to run js in active tab in browser. Use case is "User switches from browser
+  to Emacs, and want to quickly run some JS in browser. e.g when taking notes for a web page".
+  However this function wasn't taking care of multiple browser-windows, and was running JS in active
+  tab of all windows.
+
+  This behavior is now changed. This function now runs js only in active tab of [[https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/windows/getCurrent][current window]].
