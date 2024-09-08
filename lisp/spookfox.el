@@ -5,7 +5,7 @@
 ;; Author: bitspook
 ;; Homepage: https://bitspook.in/projects/spookfox
 ;; Keywords: Firefox
-;; Version: 0.4.1
+;; Version: 0.5.0
 ;; Package-Requires: ((websocket "1.13"))
 ;;
 ;;; Commentary:
@@ -24,7 +24,7 @@
 (require 'org-id)
 (require 'websocket)
 
-(defvar spookfox-version "0.4.1"
+(defvar spookfox-version "0.5.0"
   "Spookfox version.")
 (defvar spookfox-enabled-apps nil
   "List of Spookfox Apps that should be enabled in all new clients.")
