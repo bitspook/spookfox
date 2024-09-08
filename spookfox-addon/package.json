@@ -4,35 +4,34 @@
   "license": "GPL-3.0",
   "scripts": {
     "clean": "rm -rf dist && rm -rf ./addons-dist",
-    "start": "yarn clean && parcel serve src/manifest.json 'src/apps/*.ts'",
+    "start": "npm run clean && parcel serve src/manifest.json 'src/apps/*.ts'",
     "lint": "eslint src/ && tsc --noEmit",
     "build:ff": "web-ext -s ./dist -a ./addons-dist build",
     "build:chrome": "crx pack ./dist -p ./key.pem -o ./addons-dist/spookfox.crx",
-    "build:addon": "mkdir -p ./addons-dist && yarn build:chrome && yarn build:ff",
+    "build:addon": "mkdir -p ./addons-dist && npm run build:chrome && npm run build:ff",
     "build:unpackaged": "parcel build src/manifest.json 'src/apps/**/*.ts' && node ./post-build.js",
-    "build": "yarn clean && yarn build:unpackaged && yarn build:addon",
+    "build": "npm run clean && npm run build:unpackaged && npm run build:addon",
     "publish:ff-unlisted": "web-ext -s ./dist -a ./addons-dist --api-key $FIREFOX_ADDON_KEY --api-secret $FIREFOX_ADDON_SECRET sign --channel=unlisted"
   },
   "devDependencies": {
-    "@parcel/config-webextension": "^2.3.2",
-    "@parcel/transformer-sass": "^2.7.0",
-    "@types/webextension-polyfill": "^0.10.0",
-    "@typescript-eslint/eslint-plugin": "^5.12.1",
-    "@typescript-eslint/parser": "^5.12.1",
-    "crx": "^5.0.1",
-    "eslint": "^8.9.0",
-    "eslint-config-prettier": "^8.4.0",
-    "eslint-plugin-prettier": "^4.0.0",
-    "parcel": "^2.7.0",
-    "prettier": "^2.5.1",
-    "typescript": "^4.5.5",
-    "typescript-language-server": "^2.1.0",
-    "web-ext": "^7.3.1",
-    "webextension-polyfill": "^0.10.0"
+    "@parcel/config-webextension": "2.12.0",
+    "@parcel/transformer-sass": "2.12.0",
+    "@types/webextension-polyfill": "0.12.1",
+    "@typescript-eslint/eslint-plugin": "8.4.0",
+    "@typescript-eslint/parser": "8.4.0",
+    "crx": "5.0.1",
+    "eslint": "8.57.0",
+    "eslint-config-prettier": "9.1.0",
+    "eslint-plugin-prettier": "5.2.1",
+    "parcel": "2.12.0",
+    "prettier": "3.3.3",
+    "typescript": "5.5.4",
+    "typescript-language-server": "4.3.3",
+    "web-ext": "8.2.0",
+    "webextension-polyfill": "0.12.0"
   },
   "dependencies": {
-    "immer": "^9.0.12",
-    "uuid": "^8.3.2",
-    "yarn": "^1.22.19"
+    "immer": "10.1.1",
+    "uuid": "10.0.0"
   }
 }

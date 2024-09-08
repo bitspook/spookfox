@@ -1,4 +1,4 @@
-import produce, { Immutable } from 'immer';
+import {produce, Immutable } from 'immer';
 import { v4 as uuid } from 'uuid';
 
 interface ErrorResPayload {

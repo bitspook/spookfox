@@ -73,10 +73,33 @@ Depending on the kind of system, user have to do it by themselves.
               t)))
       (sft--open-or-search read-tab))))
 
+;; Spookfox iTabs
+;;
+;; iTabs is iBuffer like interface but for Firefox tabs. So you can see list of all the tabs in
+;; Firefox, and operate on them.
+(define-derived-mode spookfox-itabs-mode special-mode "Spookfox iTabs"
+  (buffer-disable-undo))
+
+(defun spookfox--itabs-update ()
+  (let ((tabs (spookfox--request-all-tabs)))
+    (cl-dolist (tab tabs)
+      (insert (plist-get tab :title))
+      (insert "\n"))))
+
+(defun spookfox-itabs ()
+  (interactive)
+  (let ((buf (get-buffer-create "*spookfox-itabs*")))
+    (switch-to-buffer buf)
+    (with-current-buffer buf
+      (save-selected-window
+        (select-window (get-buffer-window buf 0))
+        (spookfox-itabs-mode)))))
+;; End Spookfox iTabs
+
 ;;;###autoload
 (defvar spookfox-tabs
   `(:name spookfox-tabs
-    :dependencies (,spookfox-jscl)))
+          :dependencies (,spookfox-jscl)))
 
 (provide 'spookfox-tabs)
 ;;; spookfox-tabs.el ends here
