@@ -24,6 +24,10 @@ export default class JsInject implements SFApp<JsInjectState> {
       EmacsRequests.EVAL_IN_BACKGROUND_SCRIPT,
       this.evalJsInBackgroundScript
     );
+    sf.registerReqHandler(
+      EmacsRequests.EVAL_IN_TAB,
+      this.evalJsInTab
+    )
   }
 
   /**
@@ -45,11 +49,12 @@ export default class JsInject implements SFApp<JsInjectState> {
     );
   };
 
+  evalJsInTab = async ({ code, 'tab-id': tabId }: { code: string, 'tab-Id': string }) => {
+    return browser.tabs.executeScript(tabId, {code})
+  }
+
   evalJsInBackgroundScript = async ({ code }: { code: string }) => {
-    console.time('Evaluating JS');
-    console.log(code);
     const result = window.eval(code);
-    console.timeEnd('Evaluating JS');
 
     return result;
   };
@@ -64,4 +69,5 @@ export enum Actions {}
 export enum EmacsRequests {
   EVAL_IN_ACTIVE_TAB = 'JS_INJECT_EVAL_IN_ACTIVE_TAB',
   EVAL_IN_BACKGROUND_SCRIPT = 'JS_INJECT_EVAL_IN_BACKGROUND_SCRIPT',
+  EVAL_IN_TAB = 'JS_INJECT_EVAL_IN_TAB'
 }
