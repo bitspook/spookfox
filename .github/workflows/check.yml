@@ -17,10 +17,10 @@ jobs:
         with:
           node-version: '16.x'
 
-      - run: yarn
+      - run: npm ci --include=optional
         working-directory: spookfox-addon
 
-      - run: yarn lint
+      - run: npm run lint
         working-directory: spookfox-addon
 
   version-check:

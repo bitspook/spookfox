@@ -16,18 +16,18 @@ jobs:
 
       - uses: actions/setup-node@v2
         with:
-          node-version: '16.x'
+          node-version: '18.x'
 
-      - run: yarn install --frozen-lockfile
+      - run: npm ci --include=optional
         working-directory: spookfox-addon
 
       - run: echo "${{secrets.CHROME_PRIVATE_KEY}} > key.pem"
         working-directory: spookfox-addon
 
-      - run: yarn build
+      - run: npm run build
         working-directory: spookfox-addon
 
-      - run: yarn publish:ff-unlisted
+      - run: npm run publish:ff-unlisted
         working-directory: spookfox-addon
         env:
           FIREFOX_ADDON_KEY: "${{ secrets.FIREFOX_ADDON_KEY }}"
