@@ -31,7 +31,9 @@ export default class JsInject implements SFApp<JsInjectState> {
    * returns as response.
    */
   evalJsInActiveTab = async (script: browser.ExtensionTypes.InjectDetails) => {
-    const activeTabs = await browser.tabs.query({ active: true });
+    const currentWindow = await browser.windows.getCurrent()
+    const activeTabs = await browser.tabs.query({ active: true, windowId: currentWindow.id });
+
     if (!activeTabs.length) {
       throw new Error(
         'No active tab to execute script in. [script=${JSON.stringify(script)}]'
