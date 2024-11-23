@@ -207,9 +207,9 @@ Return value of HANDLER is sent back to browser as response."
          (flattened-apps
           (let ((accum nil))
             (dolist (app spookfox-enabled-apps (reverse accum))
-              (dolist (dep (plist-get app :dependencies))
+              (dolist (dep (plist-get (symbol-value app) :dependencies))
                 (cl-pushnew dep accum :test is-app-eql))
-              (cl-pushnew app accum :test is-app-eql)))))
+              (cl-pushnew (symbol-value app) accum :test is-app-eql)))))
 
     (setf spookfox--active-apps flattened-apps)
     (dolist (app spookfox--active-apps)
