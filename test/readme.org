@@ -1,9 +1,9 @@
-# Testing Spookfox
+* Testing Spookfox
 
 There are no automated tests so far. This setup is for manually testing Spookfox. This directory has
 code to set a clean testing environment on Guix.
 
-## Testing with Elpaca
+** Testing with Elpaca
 
 As prompted by #39, here's how I tested the issue:
 
