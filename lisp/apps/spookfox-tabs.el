@@ -96,11 +96,6 @@ Depending on the kind of system, user have to do it by themselves.
         (spookfox-itabs-mode)))))
 ;; End Spookfox iTabs
 
-;;;###autoload
-(defvar spookfox-tabs
-  `(:name spookfox-tabs
-          :dependencies (,spookfox-jscl)))
-
 (provide 'spookfox-tabs)
 ;;; spookfox-tabs.el ends here
 ;; Local Variables:

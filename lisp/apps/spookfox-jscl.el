@@ -51,10 +51,6 @@ form."
         (lambda (cell) `(js:Array ,(car cell) ,(cdr cell)))
         alist))))
 
-;;;###autoload
-(defvar spookfox-jscl
-  `(:name spookfox-jscl))
-
 (provide 'spookfox-jscl)
 ;;; spookfox-jscl.el ends here
 ;; Local Variables:

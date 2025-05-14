@@ -19,9 +19,6 @@
                :payload)
               windows)))))
 
-;;;###autoload
-(defvar spookfox-windows `(:name spookfox-windows))
-
 (provide 'spookfox-windows)
 ;;; spookfox-windows.el ends here
 ;; Local Variables:

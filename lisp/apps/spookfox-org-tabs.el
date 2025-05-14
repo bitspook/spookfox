@@ -1,7 +1,10 @@
 ;;; spookfox-org-tabs -- Spookfox app to manage browser tabs as org-mode subtree -*- lexical-binding: t -*-
 
 ;;; Commentary:
-;; Access, save and manipulate browser tabs
+;; ABANDONED. Please DO NOT USE THIS. I am keeping it around until I can change it to "archive tabs
+;; to org file".
+;;
+Access, save and manipulate browser tabs
 
 ;;; Code:
 (require 'org)
@@ -267,7 +270,7 @@ make changes."
                                         ; into a proper JSON array
         (concat "[" (string-join (mapcar #'json-encode group-tabs) ",") "]"))))))
 
-;;;###autoload
+;; This should be added to spookfox-client-connected-hook
 (defun spookfox-org-tabs--on-init ()
   "Initialize spookfox-org-tabs app."
   (let ((spookfox--msg-prefix spookfox-org-tabs--msg-prefix))
@@ -275,10 +278,6 @@ make changes."
     (spookfox--register-req-handler "GET_SAVED_TABS" #'spookfox-org-tabs--handle-get-saved-tabs)
     (spookfox--register-req-handler "REMOVE_TAB" #'spookfox-org-tabs--handle-remove-tab)
     (spookfox--register-req-handler "UPDATE_TAB" #'spookfox-org-tabs--handle-update-tab)))
-
-(defvar spookfox-org-tabs (list :name 'spookfox-org-tabs
-                                :on-init #'spookfox-org-tabs--on-init
-                                :dependencies (list spookfox-tabs)))
 
 (provide 'spookfox-org-tabs)
 ;;; spookfox-org-tabs.el ends here
