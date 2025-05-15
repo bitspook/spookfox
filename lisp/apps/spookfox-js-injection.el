@@ -63,6 +63,7 @@ with result of execution from each selected tab."
                       :payload)))
      selected-tabs)))
 
+;;;###autoload
 (cl-defun sfjsi-eval (js &optional (context 'background) (select-tab-p nil))
   "Evaluate JS in CONTEXT. Return the result of evaluation.
 

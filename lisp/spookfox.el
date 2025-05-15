@@ -1,5 +1,5 @@
-;;; spookfox --- Communicate with a browser which have spookfox browser addon installed. -*- lexical-binding: t -*-
-;;;
+;;; spookfox.el --- Communicate with a browser which have spookfox browser addon installed. -*- lexical-binding: t; -*-
+;;
 ;; Copyright © 2022 bitspook
 ;;
 ;; Author: bitspook
@@ -9,13 +9,13 @@
 ;; Package-Requires: ((websocket "1.13"))
 ;;
 ;;; Commentary:
-;;;
-;;; Spookfox provides means to communicate with your browser. It is (or should
-;;; be, after you write some code) capable of doing everything which the browser
-;;; allows its extensions to do.
-;;;
-;;; Please read the readme.org file in this repository for details.
-;;;
+;;
+;; Spookfox provides means to communicate with your browser. It is (or should
+;; be, after you write some code) capable of doing everything which the browser
+;; allows its extensions to do.
+;;
+;; Please read the readme.org file in this repository for details.
+;;
 ;;; Code:
 (require 'cl-lib)
 (require 'json)
@@ -106,6 +106,7 @@ request-id as key."
         ;; don't just keep lying around in `spookfox--responses'
         (push (cons (plist-get msg :requestId) msg) spookfox--responses)))))
 
+;;;###autoload
 (defun spookfox-start-server ()
   "Start websockets server."
   (interactive)
@@ -200,6 +201,7 @@ Return value of HANDLER is sent back to browser as response."
     (when cell (warn "Handler already registered. Overwriting previously registered handler."))
     (push (cons name handler) spookfox--req-handlers-alist)))
 
+;;;###autoload
 (defun spookfox-init ()
   "Initialize spookfox.
 This function is obsolete. Please use spookfox-start-server."
@@ -212,3 +214,4 @@ This function is obsolete. Please use spookfox-start-server."
   (spookfox-stop-server))
 
 (provide 'spookfox)
+;;; spookfox.el ends here
