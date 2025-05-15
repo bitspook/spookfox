@@ -1,3 +1,10 @@
+** v0.6.0
+
+- No more apps on elisp side.
+
+  They were meant to be more, but haven't grown. I deemed them a result of over-engineering, and
+  have simplified installing/setting-up spookfox by removing them.
+
 ** v0.5.0
 
 - Extended [[https://github.com/bitspook/spookfox/blob/ed35f2d57a9021ad62871ed9eb3f8eedf0d3521e/lisp/apps/spookfox-js-injection.el#L65][spookfox-js-injection-eval]] to run JS in user selected tabs. Inspired by [[https://github.com/bitspook/spookfox/issues/38][#38]]
