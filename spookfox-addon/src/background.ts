@@ -5,7 +5,6 @@ import iconEmacsColor from './icons/emacs-color.svg';
 import Tabs from './apps/Tabs';
 import OrgTabs from './apps/OrgTabs';
 import JsInject from './apps/JsInject';
-import Jscl from './apps/Jscl';
 import browser from 'webextension-polyfill';
 import Windows from './apps/Windows';
 
@@ -81,9 +80,7 @@ const run = async () => {
 
   // register all available apps
   sf.registerApp('tabs', Tabs);
-  sf.registerApp('org-tabs', OrgTabs);
   sf.registerApp('js-injection', JsInject);
-  sf.registerApp('jscl', Jscl);
   sf.registerApp('spookfox-windows', Windows);
 
   return { status: 'ok' };

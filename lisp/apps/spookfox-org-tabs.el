@@ -4,7 +4,7 @@
 ;; ABANDONED. Please DO NOT USE THIS. I am keeping it around until I can change it to "archive tabs
 ;; to org file".
 ;;
-Access, save and manipulate browser tabs
+;; Access, save and manipulate browser tabs
 
 ;;; Code:
 (require 'org)

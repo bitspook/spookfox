@@ -8,7 +8,6 @@
 (require 'org-id)
 (require 'cl-lib)
 (require 'spookfox)
-(require 'spookfox-jscl)
 
 (defvar spookfox-tabs--msg-prefix "T_")
 
@@ -65,39 +64,34 @@ Depending on the kind of system, user have to do it by themselves.
     (if selected-tab
         (let ((tab-id (plist-get selected-tab :id))
               (window-id (plist-get selected-tab :windowId)))
-          ;; (sfjsi-eval (format "browser.tabs.update(%s, { active: true });browser.windows.update(%s, { focused: true });" tab-id window-id))
-          (sfcl-eval
-           `(progn
-              (js:browser:tabs:update ,tab-id ,(sfcl-js-obj '(("active" . t))))
-              (js:browser:windows:update ,window-id ,(sfcl-js-obj '(("focused" . t))))
-              t)))
+          (sfjsi-eval (format "browser.tabs.update(%s, { active: true });browser.windows.update(%s, { focused: true });" tab-id window-id)))
       (sft--open-or-search read-tab))))
 
 ;; Spookfox iTabs
 ;;
 ;; iTabs is iBuffer like interface but for Firefox tabs. So you can see list of all the tabs in
 ;; Firefox, and operate on them.
-(define-derived-mode spookfox-itabs-mode special-mode "Spookfox iTabs"
-  (buffer-disable-undo))
+;; (define-derived-mode spookfox-itabs-mode special-mode "Spookfox iTabs"
+;;   (buffer-disable-undo))
 
-(defun spookfox--itabs-update ()
-  (let ((tabs (spookfox--request-all-tabs)))
-    (cl-dolist (tab tabs)
-      (insert (plist-get tab :title))
-      (insert "\n"))))
+;; (defun spookfox--itabs-update ()
+;;   (let ((tabs (spookfox--request-all-tabs)))
+;;     (cl-dolist (tab tabs)
+;;       (insert (plist-get tab :title))
+;;       (insert "\n"))))
 
-(defun spookfox-itabs ()
-  (interactive)
-  (let ((buf (get-buffer-create "*spookfox-itabs*")))
-    (switch-to-buffer buf)
-    (with-current-buffer buf
-      (save-selected-window
-        (select-window (get-buffer-window buf 0))
-        (spookfox-itabs-mode)))))
+;; (defun spookfox-itabs ()
+;;   (interactive)
+;;   (let ((buf (get-buffer-create "*spookfox-itabs*")))
+;;     (switch-to-buffer buf)
+;;     (with-current-buffer buf
+;;       (save-selected-window
+;;         (select-window (get-buffer-window buf 0))
+;;         (spookfox-itabs-mode)))))
 ;; End Spookfox iTabs
 
 (provide 'spookfox-tabs)
 ;;; spookfox-tabs.el ends here
 ;; Local Variables:
-;; read-symbol-shorthands: (("sft-" . "spookfox-tabs-") ("sfcl-" . "spookfox-jscl-") ("sfjsi-" . "spookfox-js-injection-"))
+;; read-symbol-shorthands: (("sft-" . "spookfox-tabs-") ("sfjsi-" . "spookfox-js-injection-"))
 ;; End:
