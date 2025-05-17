@@ -1,3 +1,31 @@
+** v0.7.0
+
+- Removed jscl and org-tabs apps
+
+  - *jscl*: [[https://github.com/jscl-project/jscl][jscl]] appear to be dead or almost dead; I don't want to build too much on top of it. The
+    way it unconditionally add console logs on startup and all the hacks I had to do to include it
+    in the addon don't give confidence.
+
+    I have decided to remove jscl from Spookfox. I hope nobody was using it.
+
+    I still want to make Spookfox extensible with a lisp. I'll probably add a scheme which has
+    better support than jscl. Or compile ECL to wasm. Or guile-hoot is looking good too. But for
+    now, no more jscl.
+
+  - *org-tabs*: This was the original feature for which I created spookfox. I haven't used it since
+    forever though because it is also most clunky. It probably didn't even work. Keeping tabs in
+    sync with Emacs needs a lot of state-management. Which becomes an impossible task given that
+    browser don't provide any way to uniquely identify a tab. Things like tab IDs change b/w browser
+    restarts, browser emits tons of events per tab which can pretty much freeze Emacs etc.
+
+    I want to pivot this to a simpler "archive all tabs" "restore tabs from archive" feature.
+    org-tabs were kept around for this. But I think it's better to let them go and build from
+    scratch when I get to implement the pivot.
+
+- Switch to tabs from all open browser windows
+
+  =spookfox-switch-tab= now show tabs from all windows of browser, instead of just one.
+
 ** v0.6.0
 
 - No more apps on elisp side.
