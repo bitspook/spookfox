@@ -79,11 +79,9 @@ const run = async () => {
   const sf = ((window as any).spookfox = new Spookfox());
 
   // register all available apps
-  sf.registerApp('tabs', Tabs);
   sf.registerApp('js-injection', JsInject);
+  sf.registerApp('tabs', Tabs);
   sf.registerApp('spookfox-windows', Windows);
-
-  return { status: 'ok' };
 
   startAutoconnectTimer(sf);
 };

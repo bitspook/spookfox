@@ -1,4 +1,4 @@
-import {produce, Immutable } from 'immer';
+import { produce, Immutable } from 'immer';
 import { v4 as uuid } from 'uuid';
 
 interface ErrorResPayload {
@@ -50,7 +50,10 @@ export enum SFEvents {
  * A custom event which has an optional payload attached.
  */
 export class SFEvent<P = any> extends Event {
-  constructor(public name: string, public payload?: P) {
+  constructor(
+    public name: string,
+    public payload?: P
+  ) {
     super(name);
   }
 }
