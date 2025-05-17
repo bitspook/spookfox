@@ -35,7 +35,7 @@
 
 (defun sft--open-or-search (term)
   "Open new tab with TERM."
-  (let ((client (cl-first spookfox--connected-clients)))
+  (dolist (client spookfox--connected-clients)
     (when client
       (cond
        ((string-match "https?:\/\/.*[\.].*" term)
