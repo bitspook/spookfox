@@ -9,7 +9,7 @@
     "build:ff": "web-ext -s ./dist -a ./addons-dist build",
     "build:chrome": "crx pack ./dist -p ./key.pem -o ./addons-dist/spookfox.crx",
     "build:addon": "mkdir -p ./addons-dist && npm run build:chrome && npm run build:ff",
-    "build:unpackaged": "parcel build src/manifest.json 'src/apps/**/*.ts' && node ./post-build.js",
+    "build:unpackaged": "parcel build src/manifest.json 'src/apps/**/*.ts'",
     "build": "npm run clean && npm run build:unpackaged && npm run build:addon",
     "publish:ff-unlisted": "web-ext -s ./dist -a ./addons-dist --api-key $FIREFOX_ADDON_KEY --api-secret $FIREFOX_ADDON_SECRET sign --channel=unlisted"
   },
