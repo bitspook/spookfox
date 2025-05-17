@@ -79,34 +79,14 @@ const startAutoconnectTimer = (sf: Spookfox) => {
 const run = async () => {
   const sf = ((window as any).spookfox = new Spookfox());
 
-  sf.registerReqHandler('ENABLE_APP', (name: string) => {
-    switch (name) {
-      case 'spookfox-tabs': {
-        sf.registerApp('tabs', Tabs);
-        break;
-      }
-      case 'spookfox-org-tabs': {
-        sf.registerApp('org-tabs', OrgTabs);
-        break;
-      }
-      case 'spookfox-js-injection': {
-        sf.registerApp('js-injection', JsInject);
-        break;
-      }
-      case 'spookfox-jscl': {
-        sf.registerApp('jscl', Jscl);
-        break;
-      }
-      case 'spookfox-windows': {
-        sf.registerApp('spookfox-windows', Windows);
-        break;
-      }
-      default:
-        return { status: 'error', message: `Uknown app ${name}` };
-    }
+  // register all available apps
+  sf.registerApp('tabs', Tabs);
+  sf.registerApp('org-tabs', OrgTabs);
+  sf.registerApp('js-injection', JsInject);
+  sf.registerApp('jscl', Jscl);
+  sf.registerApp('spookfox-windows', Windows);
 
-    return { status: 'ok' };
-  });
+  return { status: 'ok' };
 
   startAutoconnectTimer(sf);
 };

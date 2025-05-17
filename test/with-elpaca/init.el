@@ -54,6 +54,5 @@
   :ensure (spookfox :host github :repo "bitspook/spookfox" :files ("lisp/*.el" "lisp/apps/*.el"))
   :config
   (require 'spookfox-tabs)
-  (setq spookfox-enabled-apps '(spookfox-tabs))
-  (spookfox-init))
+  (spookfox-start-server))
 ;; END Spookfox
