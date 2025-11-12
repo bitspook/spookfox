@@ -125,6 +125,7 @@ request-id as key."
          :on-message #'spookfox--handle-msg
          :on-error #'spookfox--handle-server-error)))
 
+;;;###autoload
 (defun spookfox-stop-server ()
   "Stop websockets server."
   (websocket-server-close spookfox--server-process))
