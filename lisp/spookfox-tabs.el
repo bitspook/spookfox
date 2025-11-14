@@ -9,7 +9,7 @@
 (require 'cl-lib)
 (require 'spookfox)
 
-(defvar spookfox-tabs--msg-prefix "T_")
+(defvar spookfox-tabs--msg-prefix "")
 
 (defun spookfox-tabs--request (&rest args)
   "Make spookfox-request with CLIENT and ARGS but with prefixed NAME."
@@ -43,29 +43,35 @@
        (t
         (spookfox-tabs--request client "SEARCH_FOR" term))))))
 
-;;;###autoload
-;; (defun spookfox-switch-tab ()
-;;   "Like `switch-buffer' but for browser tabs.
-;; When you have too many tabs to find what you want; or you want to
-;; jump to browser with your desired tab already in focus. Or to open a new tab.
+(defun sft--focus-tab (tab-id window-id)
+  "Request browser to bring tab with TAB-ID in focus."
+  (dolist (client spookfox--connected-clients)
+    (when client
+      (spookfox-tabs--request client "FOCUS_TAB" `(:tab-id ,tab-id :window-id ,window-id)))))
 
-;; Note that this do not bring the browser window to focus.
-;; Depending on the kind of system, user have to do it by themselves.
-;; [[https://github.com/bitspook/spookmax.d/blob/aae6c47e5def0f2bc113f22931ec27c62b5365b6/readme.org?plain=1#L1757-L1764][Example]]"
-;;   (interactive)
-;;   (let* ((tabs (spookfox--request-all-tabs))
-;;          (tabs (mapcar (lambda (tab)
-;;                          (cons (concat (plist-get tab :title) "\t"
-;;                                        (propertize (plist-get tab :url) 'face 'font-lock-comment-face))
-;;                                tab))
-;;                        tabs))
-;;          (read-tab (completing-read "Select tab: " tabs))
-;;          (selected-tab (alist-get read-tab tabs nil nil #'string=)))
-;;     (if selected-tab
-;;         (let ((tab-id (plist-get selected-tab :id))
-;;               (window-id (plist-get selected-tab :windowId)))
-;;           (sfjsi-eval (format "browser.tabs.update(%s, { active: true });browser.windows.update(%s, { focused: true });" tab-id window-id)))
-;;       (sft--open-or-search read-tab))))
+;;;###autoload
+(defun spookfox-switch-tab ()
+  "Like `switch-buffer' but for browser tabs.
+When you have too many tabs to find what you want; or you want to
+jump to browser with your desired tab already in focus. Or to open a new tab.
+
+Note that this do not bring the browser window to focus.
+Depending on the kind of system, user have to do it by themselves.
+[[https://github.com/bitspook/spookmax.d/blob/aae6c47e5def0f2bc113f22931ec27c62b5365b6/readme.org?plain=1#L1757-L1764][Example]]"
+  (interactive)
+  (let* ((tabs (spookfox--request-all-tabs))
+         (tabs (mapcar (lambda (tab)
+                         (cons (concat (plist-get tab :title) "\t"
+                                       (propertize (plist-get tab :url) 'face 'font-lock-comment-face))
+                               tab))
+                       tabs))
+         (read-tab (completing-read "Select tab: " tabs))
+         (selected-tab (alist-get read-tab tabs nil nil #'string=)))
+    (if selected-tab
+        (let ((tab-id (plist-get selected-tab :id))
+              (window-id (plist-get selected-tab :windowId)))
+          (sft--focus-tab tab-id window-id))
+      (sft--open-or-search read-tab))))
 
 ;; Spookfox iTabs
 ;;

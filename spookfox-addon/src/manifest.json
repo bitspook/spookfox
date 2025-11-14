@@ -2,7 +2,7 @@
   "description": "Make web-browsers speak to Emacs",
   "manifest_version": 2,
   "name": "Spookfox",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "icons": {
     "48": "icons/emacs-color.png",
     "96": "icons/emacs-color@2x.png",
@@ -19,16 +19,16 @@
   },
   "background": {
     "scripts": [
-      "../node_modules/webextension-polyfill/dist/browser-polyfill.js",
-      "./background.ts"
+      "./vendor/browser-polyfill.js",
+      "./background.js"
     ]
   },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
       "js": [
-        "../node_modules/webextension-polyfill/dist/browser-polyfill.js",
-        "content.ts"
+        "./vendor/browser-polyfill.js",
+        "content.js"
       ]
     }
   ],

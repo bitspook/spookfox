@@ -33,7 +33,7 @@ const init = async () => {
     return;
   }
 
-  port.onMessage.addListener((msg: { type: string }) => {
+  port.onMessage.addListener((msg) => {
     switch (msg.type) {
       case 'CONNECTED':
         return handleConnected();

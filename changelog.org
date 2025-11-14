@@ -15,6 +15,10 @@
   - A guix package definition, which also doubles to setup development environment
   - A guix channel so I can install spookfox without having to use cumbersome
     (in my experience) tools like straight or elpaca
+- Remove parcel and typescript
+  - Parcel is finicky, and don't add much value for a web extension. I am tired
+    of the complexity JS-ecosystem brings. In an attempt to minimize it, I am
+    getting rid of things that aren't absolutely necessary.
 
 ** v0.7.0
 
