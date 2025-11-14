@@ -1,23 +1,17 @@
 {
   "name": "spookfox",
-  "version": "0.8.0",
+  "private": "true",
   "license": "GPL-3.0",
   "scripts": {
-    "clean": "rm -rf dist && rm -rf ./addons-dist",
-    "start": "npm run clean && parcel serve src/manifest.json 'src/apps/*.ts'",
-    "lint": "eslint src/ && tsc --noEmit",
-    "build:ff": "web-ext -s ./dist -a ./addons-dist build",
-    "build:chrome": "crx pack ./dist -p ./key.pem -o ./addons-dist/spookfox.crx",
+    "clean": "rm -rf ./addons-dist",
+    "build:ff": "web-ext -s ./src -a ./addons-dist build",
+    "build:chrome": "crx pack ./src -p ./key.pem -o ./addons-dist/spookfox.crx",
     "build:addon": "mkdir -p ./addons-dist && npm run build:chrome && npm run build:ff",
-    "build:unpackaged": "parcel build src/manifest.json 'src/apps/**/*.ts'",
-    "build": "npm run clean && npm run build:unpackaged && npm run build:addon",
-    "publish:ff-unlisted": "web-ext -s ./dist -a ./addons-dist --api-key $FIREFOX_ADDON_KEY --api-secret $FIREFOX_ADDON_SECRET sign --channel=unlisted"
+    "build": "npm run clean && npm run build:addon",
+    "publish:ff-unlisted": "web-ext -s ./src -a ./addons-dist --api-key $FIREFOX_ADDON_KEY --api-secret $FIREFOX_ADDON_SECRET sign --channel=unlisted"
   },
   "devDependencies": {
     "crx": "5.0.1",
-    "eslint": "8.57.0",
-    "eslint-config-prettier": "9.1.0",
-    "eslint-plugin-prettier": "5.2.1",
     "prettier": "3.3.3",
     "web-ext": "8.2.0",
     "webextension-polyfill": "0.12.0"

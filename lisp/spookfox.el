@@ -1,11 +1,11 @@
 ;;; spookfox.el --- Communicate with a browser which have spookfox browser addon installed. -*- lexical-binding: t; -*-
 ;;
-;; Copyright © 2022 bitspook
+;; Copyright © 2025 bitspook
 ;;
 ;; Author: bitspook
 ;; Homepage: https://bitspook.in/projects/spookfox
 ;; Keywords: Firefox
-;; Version: 0.7.1
+;; Version: 0.8.0
 ;; Package-Requires: ((websocket "1.13"))
 ;;
 ;;; Commentary:
@@ -24,7 +24,7 @@
 (require 'org-id)
 (require 'websocket)
 
-(defvar spookfox-version "0.7.1"
+(defvar spookfox-version "0.8.0"
   "Spookfox version.")
 (defvar spookfox--responses nil
   "Alist of responses received. Key is the request-id, val is the response.")

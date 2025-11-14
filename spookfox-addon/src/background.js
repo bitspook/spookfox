@@ -9,9 +9,7 @@ const SFEvents = {
   // A request Emacs sent to do something or to provide some information
   REQUEST: 'REQUEST',
   // Response Emacs sent for a request we made
-  RESPONSE: 'RESPONSE',
-  // Spookfox has had a state change, and new state is available
-  NEW_STATE: 'NEW_STATE',
+  RESPONSE: 'RESPONSE'
 };
 
 const LogLevel = {
@@ -193,21 +191,6 @@ class Spookfox extends EventTarget {
   }
 
   /**
-   * Change Spookfox state. Calling this will set the state to new given state,
-   * and emit `SFEvents.NEW_STATE` event.
-   * Spookfox.state should be treated as immutable and shouldn't be modified in-place.
-   * # Example
-   * ```
-   * const newState = { ... };
-   * sf.newState(newState, 'X kind of change.');
-   * ```
-   */
-  replaceState(s) {
-    this.state = s;
-    this.emit(SFEvents.NEW_STATE, s);
-  }
-
-  /**
    * Handle `SFEvents.REQUEST` events.
    */
   handleRequest = async (e) => {
@@ -268,56 +251,6 @@ class Spookfox extends EventTarget {
       }, maxWait);
     });
   };
-
-  rootReducer({ name, payload }) {
-    const [appName, actionName] = name.split('/');
-
-    if (!appName || !actionName) {
-      throw new Error(
-        'Invalid Action "`${name}`". Action should be in format "<app-name>/<action-name>"'
-      );
-    }
-
-    if (this.logLevel) {
-      console.groupCollapsed(name);
-      console.log('Payload', payload);
-    }
-
-    const app = this.apps[appName];
-
-    if (!app) {
-      console.log('APPS', app, appName, this.apps[appName]);
-      console.groupEnd();
-      throw new Error(
-        `Could not find Spookfox app "${appName}". Was it registered?`
-      );
-    }
-
-    const nextState = produce(this.state, (draft) => {
-      draft[appName] = app.reducer(
-        { name: actionName, payload },
-        draft[appName]
-      );
-    });
-
-    if (this.logLevel) {
-      console.log('Next state', nextState);
-      console.groupEnd();
-    }
-
-    return nextState;
-  }
-
-  dispatch(name, payload) {
-    // Need to manually do the error handling here because Firefox is eating
-    // these errors up and not showing them in addon's console
-    try {
-      const newState = this.rootReducer({ name, payload });
-      this.replaceState(newState);
-    } catch (err) {
-      console.error('Error during dispatching action, [err=', err, ']');
-    }
-  }
 }
 
 const iconEmacsMono = './icons/emacs-mono.svg';
