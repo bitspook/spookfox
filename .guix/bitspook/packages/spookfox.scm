@@ -14,7 +14,7 @@
 (define-public emacs-spookfox
   (package
     (name "emacs-spookfox")
-    (version "0.8.0")
+    (version "0.8.1")
     (source (local-file "../../../lisp" #:recursive? #t))
     (build-system emacs-build-system)
     (native-inputs (list gnu-make node emacs-minimal guile-next guile-ares-rs))

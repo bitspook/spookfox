@@ -31,7 +31,7 @@ endif
 		sed -i '/"version".*/s/"[0-9\.]*"/"$(VERSION)"/' spookfox-addon/src/manifest.json
 		sed -i '/defvar.*version.*/s/"[0-9\.]*"/"$(VERSION)"/' lisp/spookfox.el
 		sed -i '/Version/s/[0-9]\.[0-9]\.[0-9]/$(VERSION)/g' lisp/spookfox.el
-		git add guix.scm spookfox-addon/src/manifest.json lisp/spookfox.el
+		git add ${guix_pkg_file} spookfox-addon/src/manifest.json lisp/spookfox.el
 		git commit -m 'Version bump to $(VERSION)'
 		git tag -a v$(VERSION) -m "Version $(VERSION)"
 		@echo "Version set to: ${VERSION}"
