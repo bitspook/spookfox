@@ -14,7 +14,10 @@
     },
     "gecko": {
       "id": "spookfox@bitspook.in",
-      "strict_min_version": "70.0"
+      "strict_min_version": "102.0",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
     }
   },
   "background": {
@@ -25,7 +28,9 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
+      "matches": [
+        "<all_urls>"
+      ],
       "js": [
         "./vendor/browser-polyfill.js",
         "content.js"
@@ -41,7 +46,12 @@
     "default_title": "Spookfox",
     "default_popup": "popup/global.html"
   },
-  "permissions": ["<all_urls>", "tabs", "search", "scripting"],
+  "permissions": [
+    "<all_urls>",
+    "tabs",
+    "search",
+    "scripting"
+  ],
   "web_accessible_resources": [],
   "content_security_policy": "script-src 'self' blob: filesystem: 'unsafe-eval';object-src 'self' blob: filesystem:;"
 }
