@@ -5,7 +5,7 @@
 ;; Author: bitspook
 ;; Homepage: https://bitspook.in/projects/spookfox
 ;; Keywords: Firefox
-;; Version: 0.8.0
+;; Version: 0.8.1
 ;; Package-Requires: ((websocket "1.13"))
 ;;
 ;;; Commentary:
@@ -24,7 +24,7 @@
 (require 'org-id)
 (require 'websocket)
 
-(defvar spookfox-version "0.8.0"
+(defvar spookfox-version "0.8.1"
   "Spookfox version.")
 (defvar spookfox--responses nil
   "Alist of responses received. Key is the request-id, val is the response.")
