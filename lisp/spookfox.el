@@ -128,6 +128,7 @@ request-id as key."
 ;;;###autoload
 (defun spookfox-stop-server ()
   "Stop websockets server."
+  (interactive)
   (websocket-server-close spookfox--server-process))
 
 (defun spookfox-request (client-ws name &optional payload)
@@ -165,7 +166,7 @@ reaching exit condition in recursive re-checks."
       (when (> retry-count 10)
         (cl-return-from spookfox--poll-response))
       (when (not msg)
-        (sleep-for 0 50)
+        (sleep-for .5)
         (cl-return-from spookfox--poll-response (spookfox--poll-response request-id (1+ retry-count))))
       (setf spookfox--responses (delq (assoc request-id spookfox--responses 'equal) spookfox--responses))
       msg)))
@@ -201,18 +202,6 @@ Return value of HANDLER is sent back to browser as response."
          (cell (assoc name spookfox--req-handlers-alist #'string=)))
     (when cell (warn "Handler already registered. Overwriting previously registered handler."))
     (push (cons name handler) spookfox--req-handlers-alist)))
-
-;;;###autoload
-(defun spookfox-init ()
-  "Initialize spookfox.
-This function is obsolete. Please use spookfox-start-server."
-  (spookfox-start-server))
-(make-obsolete #'spookfox-init #'spookfox-start-server 'v0.6.0)
-
-(defun spookfox-shutdown ()
-  "Stop spookfox."
-  (interactive)
-  (spookfox-stop-server))
 
 (provide 'spookfox)
 ;;; spookfox.el ends here

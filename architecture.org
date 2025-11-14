@@ -7,15 +7,14 @@ Spookfox involves following major parts in terms of a tech stack.
 
 To make the browser extension talk to Emacs, Spookfox uses Websockets. A
 websockets server is started in Emacs, to which browser addon then connects.
-Emacs itself proved unusable as a native-messaging client.
+Emacs itself proved unusable as a [[https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Native_messaging][native-messaging]] client.
 
 * Level 0
 
-Low level communication between browser and Emacs over websockets.
+Low level communication between browser and Emacs in terms of bytes sent over
+websockets.
 
 ** Components
-
-Spookfox has 3 primary components:
 
 1. <<sa>> : spookfox-addon : Firefox addon written in Javascript
 2. <<se>> : spookfox-el : Emacs package written in Emacs Lisp

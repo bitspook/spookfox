@@ -104,9 +104,7 @@ export class Spookfox extends EventTarget {
   }
 
   get logLevel(): LogLevel {
-    return (
-      parseInt(localStorage.getItem('SPOOKFOX_DEBUG'), 10) || LogLevel.Error
-    );
+    return parseInt(localStorage.getItem('DEBUG'), 10) || LogLevel.Error;
   }
 
   addEventListener(

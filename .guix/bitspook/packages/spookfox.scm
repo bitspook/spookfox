@@ -1,4 +1,4 @@
-(define-module (bitspook packages spookfox) 
+(define-module (bitspook packages spookfox)
   #:use-module (guix)
   #:use-module (guix packages)
   #:use-module (guix git-download)
@@ -13,9 +13,9 @@
 
 (define-public emacs-spookfox
   (package
-    (name "spookfox")
-    (version "0.7.1")
-    (source (local-file "./lisp" #:recursive? #t))
+    (name "emacs-spookfox")
+    (version "0.8.0")
+    (source (local-file "../../../lisp" #:recursive? #t))
     (build-system emacs-build-system)
     (native-inputs (list gnu-make node emacs-minimal guile-next guile-ares-rs))
     (propagated-inputs (list emacs-websocket))

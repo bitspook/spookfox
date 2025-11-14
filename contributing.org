@@ -9,19 +9,10 @@ guide to setup a development environment.
 
 ** Setup
 
-*** Without Nix
+You will need to make sure that following software are available in your
+=$PATH=.
 
-If you don't have [[https://nixos.org/][Nix]] installed, you will need to make sure that following
-software are available in your =$PATH=.
-
-1. Node.js, for building the spookfox add-on
-
-*** With Nix
-
-If you have Nix installed, you can just do =nix-shell= to drop into an already
-setup development environment. Or if you are using [[https://direnv.net/][direnv]], just do a =direnv
-allow= to achieve the same.
-
+1. Node.js (and npm), for building the spookfox add-on
 
 ** Install the addon
 
@@ -48,8 +39,8 @@ repo.
 #+begin_src elisp
   (use-package spookfox
         :straight (spookfox :type git
-                            :local-repo "~/Documents/work/spookfox"
-                            :files ("lisp/*.el" "lisp/apps/*.el"))
+                            :local-repo "~/code/spookfox"
+                            :files ("lisp/*.el"))
         :config
         (spookfox-init))
 #+end_src
@@ -69,11 +60,11 @@ This is how I install it in [[https://github.com/bitspook/spookmax.d/][my config
 
 - Log state-changing events
 
-  To see various levels of logged messages, please set =SPOOKFOX_DEBUG= to a
+  To see various levels of logged messages, please set =DEBUG= to a
   number b/w 0 and 2 in =localStorage= i.e
 
   #+begin_src js
-    localStorage.setItem('SPOOKFOX_DEBUG', 1)
+    localStorage.setItem('DEBUG', 1)
   #+end_src
 
   0 -> Log errors

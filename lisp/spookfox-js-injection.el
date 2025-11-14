@@ -1,7 +1,7 @@
-;;; spookfox-js-injection -- Spookfox app to inject Javascript into browser tabs -*- lexical-binding: t -*-
+;;; spookfox-js-injection -- Use spookfox to inject Javascript into browser tabs -*- lexical-binding: t -*-
 
 ;;; Commentary:
-;; Access, save and manipulate browser tabs
+;; Send Javascript to Firefox and get results back.
 
 ;;; Code:
 (require 'org)
