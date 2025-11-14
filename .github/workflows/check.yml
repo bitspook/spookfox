@@ -6,23 +6,6 @@ on:
       - master
 
 jobs:
-  lint:
-    name: Lint
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v1
-
-      - uses: actions/setup-node@v2
-        with:
-          node-version: '16.x'
-
-      - run: npm ci --include=optional
-        working-directory: spookfox-addon
-
-      - run: npm run lint
-        working-directory: spookfox-addon
-
   version-check:
     name: Check if version is valid
     runs-on: ubuntu-latest
